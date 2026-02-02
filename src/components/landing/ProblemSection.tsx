@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useInView } from "framer-motion";
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { Clock, Frown, Layers, Bot, Award } from "lucide-react";
 
 // Platform icons
@@ -73,31 +73,6 @@ const painPoints = [
   { icon: Award, text: "Creators want credibility, not hype" },
 ];
 
-const RingIcon = ({ 
-  icon: Icon, 
-  color, 
-  x, 
-  y 
-}: { 
-  icon: React.FC; 
-  color: string; 
-  x: number; 
-  y: number;
-}) => (
-  <div
-    className={`absolute ${color}`}
-    style={{ 
-      left: "50%", 
-      top: "50%",
-      transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`
-    }}
-  >
-    <div className="rounded-xl border border-border bg-card p-3 shadow-lg">
-      <Icon />
-    </div>
-  </div>
-);
-
 const ProblemSection = () => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
@@ -145,8 +120,8 @@ const ProblemSection = () => {
             transition={{ duration: 0.6, delay: 0.3 }}
             className="relative hidden lg:block"
           >
-            <div className="relative aspect-square">
-              {/* Background blue bubbles */}
+            <div className="relative aspect-square flex items-center justify-center">
+              {/* Background bubbles */}
               <motion.div
                 animate={{ rotate: 360 }}
                 transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
@@ -158,28 +133,35 @@ const ProblemSection = () => {
                 <div className="absolute right-1/3 top-1/3 h-16 w-16 rounded-full bg-primary/12" />
               </motion.div>
 
-              {/* Rotating ring of platform icons */}
+              {/* Rotating ring of platform icons - centered with same origin as card */}
               <motion.div
                 animate={{ rotate: 360 }}
                 transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
-                className="absolute inset-0"
+                className="absolute"
+                style={{ width: ringRadius * 2 + 60, height: ringRadius * 2 + 60 }}
               >
                 {floatingPlatforms.map((platform, index) => (
-                  <RingIcon
+                  <div
                     key={index}
-                    icon={platform.icon}
-                    color={platform.color}
-                    x={platform.initialX}
-                    y={platform.initialY}
-                  />
+                    className={`absolute ${platform.color}`}
+                    style={{ 
+                      left: "50%", 
+                      top: "50%",
+                      transform: `translate(calc(-50% + ${platform.initialX}px), calc(-50% + ${platform.initialY}px))`
+                    }}
+                  >
+                    <div className="rounded-xl border border-border bg-card p-3 shadow-lg">
+                      <platform.icon />
+                    </div>
+                  </div>
                 ))}
               </motion.div>
 
-              {/* Central element */}
+              {/* Central element - using flexbox centering from parent */}
               <motion.div
                 animate={{ y: [0, -10, 0] }}
                 transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2"
+                className="relative z-10"
               >
                 <div className="flex h-40 w-40 items-center justify-center rounded-2xl border border-border bg-card shadow-xl">
                   <div className="text-center">
