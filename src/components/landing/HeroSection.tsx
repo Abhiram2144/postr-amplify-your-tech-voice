@@ -65,13 +65,13 @@ const HeroSection = () => {
   });
   const y = useTransform(scrollYProgress, [0, 1], [0, 100]);
   const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
-  return <section ref={ref} className="relative min-h-screen overflow-hidden pt-16">
+  return <section ref={ref} className="relative min-h-screen overflow-hidden pt-16 pb-0">
       {/* Background Effects - Light theme */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,hsl(199,89%,48%,0.06),transparent_50%)]" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,hsl(187,92%,42%,0.04),transparent_50%)]" />
 
-      {/* Grid pattern */}
-      <div className="absolute inset-0 bg-[linear-gradient(hsl(214,32%,91%,0.4)_1px,transparent_1px),linear-gradient(90deg,hsl(214,32%,91%,0.4)_1px,transparent_1px)] bg-[size:64px_64px]" />
+      {/* Grid pattern with fade at bottom */}
+      <div className="absolute inset-0 bg-[linear-gradient(hsl(214,32%,91%,0.4)_1px,transparent_1px),linear-gradient(90deg,hsl(214,32%,91%,0.4)_1px,transparent_1px)] bg-[size:64px_64px]" style={{ maskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)' }} />
 
       <motion.div style={{
       y,
@@ -177,7 +177,7 @@ const HeroSection = () => {
           </motion.div>
         </motion.div>
 
-        {/* Platform Icons */}
+        {/* Platform Icons - Infinite Marquee */}
         <motion.div initial={{
         opacity: 0,
         y: 30
@@ -188,27 +188,39 @@ const HeroSection = () => {
         duration: 0.7,
         delay: 0.4,
         ease: "easeOut"
-      }} className="mt-16 flex flex-col items-center gap-4">
+      }} className="mt-16 flex flex-col items-center gap-4 w-full">
           <span className="text-sm text-muted-foreground">Generate content for all major platforms</span>
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            {platforms.map((platform, index) => <motion.div key={platform.name} initial={{
-            opacity: 0,
-            scale: 0.8
-          }} animate={{
-            opacity: 1,
-            scale: 1
-          }} transition={{
-            duration: 0.4,
-            delay: 0.5 + index * 0.05
-          }} whileHover={{
-            y: -2,
-            scale: 1.05
-          }} className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 shadow-sm transition-colors hover:border-primary/30">
-                <span className={platform.color}>
-                  <platform.icon />
-                </span>
-                <span className="text-sm font-medium text-muted-foreground">{platform.name}</span>
-              </motion.div>)}
+          <div className="relative w-full overflow-hidden">
+            {/* Gradient masks */}
+            <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
+            <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
+            
+            <motion.div 
+              className="flex gap-3"
+              animate={{
+                x: [0, -((platforms.length * 140) + (platforms.length * 12))]
+              }}
+              transition={{
+                x: {
+                  duration: 20,
+                  repeat: Infinity,
+                  ease: "linear"
+                }
+              }}
+            >
+              {/* Double the platforms for seamless loop */}
+              {[...platforms, ...platforms, ...platforms].map((platform, index) => (
+                <div 
+                  key={`${platform.name}-${index}`}
+                  className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 shadow-sm shrink-0"
+                >
+                  <span className={platform.color}>
+                    <platform.icon />
+                  </span>
+                  <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">{platform.name}</span>
+                </div>
+              ))}
+            </motion.div>
           </div>
         </motion.div>
       </motion.div>

@@ -78,7 +78,7 @@ const ProblemSection = () => {
   const isInView = useInView(ref, { once: true, margin: "-100px" });
 
   return (
-    <section ref={ref} className="relative border-t border-border py-24 sm:py-32">
+    <section ref={ref} className="relative py-24 sm:py-32">
       <div className="container mx-auto px-4">
         <div className="grid items-center gap-12 lg:grid-cols-2">
           {/* Left - Copy */}
