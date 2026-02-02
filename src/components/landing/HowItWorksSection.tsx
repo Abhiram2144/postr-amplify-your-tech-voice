@@ -1,6 +1,7 @@
 import { motion, useInView, AnimatePresence } from "framer-motion";
 import { useRef, useState } from "react";
-import { Upload, Search, Sparkles, Send, Check } from "lucide-react";
+import { Upload, Search, Sparkles, Send, Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const steps = [
   {
@@ -167,20 +168,20 @@ const HowItWorksSection = () => {
             transition={{ duration: 0.5, delay: 0.1, ease: "easeOut" }}
             className="relative mb-12"
           >
-            {/* Background track */}
-            <div className="absolute left-0 right-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-secondary" />
-            
-            {/* Animated progress line */}
-            <motion.div
-              className="absolute left-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-gradient-to-r from-primary to-accent"
-              initial={{ scaleX: 0 }}
-              animate={{ scaleX: activeStep / (steps.length - 1) }}
-              transition={{ duration: 0.4, ease: "easeInOut" }}
-              style={{ transformOrigin: "left", width: "100%" }}
-            />
-
             {/* Step indicators */}
             <div className="relative flex justify-between">
+              {/* Progress track - positioned at icon center (h-14 = 56px, center = 28px) */}
+              <div className="absolute left-[28px] right-[28px] top-[28px] h-1 -translate-y-1/2 rounded-full bg-secondary" />
+              
+              {/* Animated progress line */}
+              <motion.div
+                className="absolute left-[28px] right-[28px] top-[28px] h-1 -translate-y-1/2 rounded-full bg-gradient-to-r from-primary to-accent"
+                initial={{ scaleX: 0 }}
+                animate={{ scaleX: activeStep / (steps.length - 1) }}
+                transition={{ duration: 0.4, ease: "easeInOut" }}
+                style={{ transformOrigin: "left" }}
+              />
+
               {steps.map((step, index) => {
                 const isActive = index === activeStep;
                 const isCompleted = index < activeStep;
@@ -190,7 +191,7 @@ const HowItWorksSection = () => {
                   <motion.button
                     key={index}
                     onClick={() => handleStepClick(index)}
-                    className="group relative flex flex-col items-center"
+                    className="group relative z-10 flex flex-col items-center"
                     animate={{
                       scale: isActive ? 1.05 : 1,
                       opacity: isCompleted || isActive ? 1 : 0.4,
@@ -199,7 +200,7 @@ const HowItWorksSection = () => {
                   >
                     {/* Step circle */}
                     <div
-                      className={`relative z-10 flex h-14 w-14 items-center justify-center rounded-full border-2 transition-all duration-300 ${
+                      className={`flex h-14 w-14 items-center justify-center rounded-full border-2 transition-all duration-300 ${
                         isActive
                           ? "border-primary bg-primary text-primary-foreground shadow-lg"
                           : isCompleted
@@ -290,6 +291,32 @@ const HowItWorksSection = () => {
               </div>
             </motion.div>
           </AnimatePresence>
+
+          {/* Navigation Buttons */}
+          <div className="mt-6 flex items-center justify-between">
+            <Button
+              variant="outline"
+              onClick={() => setActiveStep((prev) => Math.max(0, prev - 1))}
+              disabled={activeStep === 0}
+              className="gap-2"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Previous
+            </Button>
+            
+            <span className="text-sm text-muted-foreground">
+              {activeStep + 1} of {steps.length}
+            </span>
+            
+            <Button
+              onClick={() => setActiveStep((prev) => Math.min(steps.length - 1, prev + 1))}
+              disabled={activeStep === steps.length - 1}
+              className="gap-2"
+            >
+              Next
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
     </section>
