@@ -40,17 +40,27 @@ const benefits = [
 const Card3D = ({ benefit, index, isInView }: { benefit: typeof benefits[0]; index: number; isInView: boolean }) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const [isHovered, setIsHovered] = useState(false);
+  const rafRef = useRef<number | null>(null);
+  const latestRef = useRef({ xPct: 0, yPct: 0 });
 
   const x = useMotionValue(0);
   const y = useMotionValue(0);
 
-  const mouseXSpring = useSpring(x, { stiffness: 150, damping: 15 });
-  const mouseYSpring = useSpring(y, { stiffness: 150, damping: 15 });
+  const mouseXSpring = useSpring(x, { stiffness: 220, damping: 24, mass: 0.8 });
+  const mouseYSpring = useSpring(y, { stiffness: 220, damping: 24, mass: 0.8 });
 
-  const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], ["17.5deg", "-17.5deg"]);
-  const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], ["-17.5deg", "17.5deg"]);
+  const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], ["10deg", "-10deg"]);
+  const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], ["-10deg", "10deg"]);
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+  const hoverBg = benefit.gradient.includes("violet")
+    ? "linear-gradient(135deg, hsl(270 60% 96%), hsl(var(--card) / 0.9))"
+    : benefit.gradient.includes("cyan")
+      ? "linear-gradient(135deg, hsl(185 60% 96%), hsl(var(--card) / 0.9))"
+      : benefit.gradient.includes("emerald")
+        ? "linear-gradient(135deg, hsl(160 60% 96%), hsl(var(--card) / 0.9))"
+        : "linear-gradient(135deg, hsl(35 60% 96%), hsl(var(--card) / 0.9))";
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!cardRef.current) return;
     const rect = cardRef.current.getBoundingClientRect();
     const width = rect.width;
@@ -59,14 +69,26 @@ const Card3D = ({ benefit, index, isInView }: { benefit: typeof benefits[0]; ind
     const mouseY = e.clientY - rect.top;
     const xPct = mouseX / width - 0.5;
     const yPct = mouseY / height - 0.5;
-    x.set(xPct);
-    y.set(yPct);
+
+    latestRef.current = { xPct, yPct };
+    if (rafRef.current != null) return;
+
+    rafRef.current = window.requestAnimationFrame(() => {
+      x.set(latestRef.current.xPct);
+      y.set(latestRef.current.yPct);
+      rafRef.current = null;
+    });
   };
 
-  const handleMouseLeave = () => {
+  const handlePointerLeave = () => {
     setIsHovered(false);
     x.set(0);
     y.set(0);
+
+    if (rafRef.current != null) {
+      window.cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
   };
 
   return (
@@ -75,39 +97,46 @@ const Card3D = ({ benefit, index, isInView }: { benefit: typeof benefits[0]; ind
       initial={{ opacity: 0, y: 50, rotateX: -10 }}
       animate={isInView ? { opacity: 1, y: 0, rotateX: 0 } : {}}
       transition={{ duration: 0.6, delay: 0.15 + index * 0.1, ease: "easeOut" }}
-      onMouseMove={handleMouseMove}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={handleMouseLeave}
+      onPointerMove={handlePointerMove}
+      onPointerEnter={() => setIsHovered(true)}
+      onPointerLeave={handlePointerLeave}
       style={{
         rotateX,
         rotateY,
         transformStyle: "preserve-3d",
+        willChange: "transform",
       }}
-      className="group relative cursor-pointer"
+      className="group relative cursor-pointer transform-gpu"
     >
       {/* Card container */}
       <motion.div
         animate={{
           scale: isHovered ? 1.02 : 1,
         }}
-        transition={{ duration: 0.2 }}
-        className={`relative h-full overflow-hidden rounded-2xl border border-border/50 backdrop-blur-sm transition-colors duration-500 ease-out ${isHovered ? '' : 'bg-card/80'}`}
-        style={{ 
+        transition={{ type: "spring", stiffness: 320, damping: 24, mass: 0.6 }}
+        className="relative h-full overflow-hidden rounded-2xl border border-border/60 bg-card/90 shadow-sm transition-[border-color,box-shadow] duration-200 ease-out group-hover:border-border/80 group-hover:shadow-xl"
+        style={{
           transformStyle: "preserve-3d",
-          background: isHovered 
-            ? `linear-gradient(135deg, ${benefit.gradient.includes('violet') ? 'hsl(270, 60%, 96%)' : benefit.gradient.includes('cyan') ? 'hsl(185, 60%, 96%)' : benefit.gradient.includes('emerald') ? 'hsl(160, 60%, 96%)' : 'hsl(35, 60%, 96%)'}, hsl(var(--card) / 0.8))`
-            : undefined
+          willChange: "transform",
         }}
       >
+        {/* Hover background overlay (opacity fade = smooth + cheap) */}
+        <motion.div
+          className="pointer-events-none absolute inset-0"
+          animate={{ opacity: isHovered ? 1 : 0 }}
+          transition={{ duration: 0.18, ease: "easeOut" }}
+          style={{ background: hoverBg }}
+        />
+
         {/* Shine effect */}
         <motion.div
-          className="absolute inset-0 opacity-0 group-hover:opacity-100"
+          className="pointer-events-none absolute inset-0"
           style={{
             background: `linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.15) 45%, rgba(255, 255, 255, 0.25) 50%, rgba(255, 255, 255, 0.15) 55%, transparent 60%)`,
             transform: "translateX(-100%)",
           }}
-          animate={isHovered ? { transform: "translateX(100%)" } : { transform: "translateX(-100%)" }}
-          transition={{ duration: 0.6, ease: "easeInOut" }}
+          animate={isHovered ? { opacity: 1, transform: "translateX(100%)" } : { opacity: 0, transform: "translateX(-100%)" }}
+          transition={{ duration: 0.5, ease: "easeInOut" }}
         />
 
         {/* Content */}
@@ -142,25 +171,18 @@ const Card3D = ({ benefit, index, isInView }: { benefit: typeof benefits[0]; ind
           <motion.div
             animate={isHovered ? { scale: 1.2, opacity: 0.6 } : { scale: 1, opacity: 0.3 }}
             transition={{ duration: 0.3 }}
-            className={`absolute -right-4 -top-4 h-24 w-24 rounded-full bg-gradient-to-br ${benefit.gradient} blur-2xl`}
+            className={`absolute -right-4 -top-4 h-24 w-24 rounded-full bg-gradient-to-br ${benefit.gradient} blur-xl`}
             style={{ transform: "translateZ(-10px)" }}
           />
         </div>
 
         {/* Bottom gradient accent */}
-        <div className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${benefit.gradient} opacity-0 transition-opacity duration-300 group-hover:opacity-100`} />
+        <motion.div
+          className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${benefit.gradient}`}
+          animate={{ opacity: isHovered ? 1 : 0 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+        />
       </motion.div>
-
-      {/* 3D Shadow */}
-      <motion.div
-        className="absolute inset-0 -z-10 rounded-2xl bg-black/20 blur-xl"
-        animate={{
-          scale: isHovered ? 0.95 : 0.9,
-          y: isHovered ? 20 : 10,
-          opacity: isHovered ? 0.3 : 0.15,
-        }}
-        transition={{ duration: 0.3 }}
-      />
     </motion.div>
   );
 };
@@ -184,7 +206,7 @@ const BenefitsSection = () => {
           </h2>
         </motion.div>
 
-        <div className="mx-auto mt-16 grid max-w-5xl gap-8 sm:grid-cols-2" style={{ transformStyle: "preserve-3d" }}>
+        <div className="mx-auto mt-16 grid max-w-5xl gap-8 sm:grid-cols-2">
           {benefits.map((benefit, index) => (
             <Card3D key={index} benefit={benefit} index={index} isInView={isInView} />
           ))}
