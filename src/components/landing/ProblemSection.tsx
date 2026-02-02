@@ -73,90 +73,30 @@ const painPoints = [
   { icon: Award, text: "Creators want credibility, not hype" },
 ];
 
-const FloatingIcon = ({ 
+const RingIcon = ({ 
   icon: Icon, 
   color, 
-  initialX, 
-  initialY 
+  x, 
+  y 
 }: { 
   icon: React.FC; 
   color: string; 
-  initialX: number; 
-  initialY: number;
-}) => {
-  const [isHovered, setIsHovered] = useState(false);
-  const [position, setPosition] = useState({ x: initialX, y: initialY });
-
-  const handleHover = () => {
-    setIsHovered(true);
-    // Calculate angle from center to current position
-    const angleFromCenter = Math.atan2(position.y, position.x);
-    // Add some randomness but keep moving outward from center
-    const randomOffset = (Math.random() - 0.5) * (Math.PI / 3);
-    const finalAngle = angleFromCenter + randomOffset;
-    const distance = 60 + Math.random() * 30;
-    
-    // Calculate new position, ensuring minimum distance from center
-    let newX = position.x + Math.cos(finalAngle) * distance;
-    let newY = position.y + Math.sin(finalAngle) * distance;
-    
-    // Ensure minimum distance from center (avoid going behind the text block)
-    const minDistance = 100;
-    const maxDistance = 180;
-    const distFromCenter = Math.sqrt(newX * newX + newY * newY);
-    
-    if (distFromCenter < minDistance) {
-      // Push outward to minimum distance
-      const scale = minDistance / distFromCenter;
-      newX *= scale;
-      newY *= scale;
-    } else if (distFromCenter > maxDistance) {
-      // Keep within bounds
-      const scale = maxDistance / distFromCenter;
-      newX *= scale;
-      newY *= scale;
-    }
-    
-    setPosition({ x: newX, y: newY });
-    setTimeout(() => setIsHovered(false), 500);
-  };
-
-  return (
-    <motion.div
-      className={`absolute cursor-pointer ${color}`}
-      initial={{ x: initialX, y: initialY, opacity: 0 }}
-      animate={{
-        x: position.x,
-        y: position.y,
-        opacity: 1,
-        scale: isHovered ? 0.8 : 1,
-      }}
-      transition={{
-        x: { type: "spring", stiffness: 100, damping: 15 },
-        y: { type: "spring", stiffness: 100, damping: 15 },
-        opacity: { duration: 0.5 },
-        scale: { duration: 0.2 },
-      }}
-      onMouseEnter={handleHover}
-      style={{ left: "50%", top: "50%" }}
-    >
-      <motion.div
-        animate={{
-          x: [0, Math.random() * 10 - 5, 0],
-          y: [0, Math.random() * 10 - 5, 0],
-        }}
-        transition={{
-          duration: 3 + Math.random() * 2,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
-        className="rounded-xl border border-border bg-card p-3 shadow-lg transition-shadow hover:shadow-xl"
-      >
-        <Icon />
-      </motion.div>
-    </motion.div>
-  );
-};
+  x: number; 
+  y: number;
+}) => (
+  <div
+    className={`absolute ${color}`}
+    style={{ 
+      left: "50%", 
+      top: "50%",
+      transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`
+    }}
+  >
+    <div className="rounded-xl border border-border bg-card p-3 shadow-lg">
+      <Icon />
+    </div>
+  </div>
+);
 
 const ProblemSection = () => {
   const ref = useRef(null);
@@ -218,16 +158,22 @@ const ProblemSection = () => {
                 <div className="absolute right-1/3 top-1/3 h-16 w-16 rounded-full bg-primary/12" />
               </motion.div>
 
-              {/* Floating platform icons in a ring */}
-              {floatingPlatforms.map((platform, index) => (
-                <FloatingIcon
-                  key={index}
-                  icon={platform.icon}
-                  color={platform.color}
-                  initialX={platform.initialX}
-                  initialY={platform.initialY}
-                />
-              ))}
+              {/* Rotating ring of platform icons */}
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
+                className="absolute inset-0"
+              >
+                {floatingPlatforms.map((platform, index) => (
+                  <RingIcon
+                    key={index}
+                    icon={platform.icon}
+                    color={platform.color}
+                    x={platform.initialX}
+                    y={platform.initialY}
+                  />
+                ))}
+              </motion.div>
 
               {/* Central element */}
               <motion.div
