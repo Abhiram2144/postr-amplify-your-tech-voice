@@ -33,27 +33,29 @@ const InstagramIcon = () => (
 const LinkedInPost = ({ className }: { className?: string }) => (
   <motion.div
     initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 0.15, y: 0 }}
+    animate={{ opacity: 0.7, y: 0 }}
     transition={{ duration: 0.8, delay: 0.5 }}
-    className={`absolute w-48 rounded-lg border border-white/20 bg-white/10 p-3 backdrop-blur-sm ${className}`}
+    className={`absolute w-52 rounded-lg border border-white/30 bg-white/20 p-3 shadow-xl backdrop-blur-md ${className}`}
   >
     <div className="flex items-center gap-2">
-      <div className="h-6 w-6 rounded-full bg-white/30" />
+      <div className="h-7 w-7 rounded-full bg-white/50" />
       <div className="flex-1">
-        <div className="h-2 w-16 rounded bg-white/30" />
-        <div className="mt-1 h-1.5 w-12 rounded bg-white/20" />
+        <div className="h-2.5 w-20 rounded bg-white/50" />
+        <div className="mt-1 h-2 w-14 rounded bg-white/30" />
       </div>
-      <LinkedInIcon />
+      <div className="text-white/80">
+        <LinkedInIcon />
+      </div>
     </div>
     <div className="mt-3 space-y-1.5">
-      <div className="h-2 w-full rounded bg-white/25" />
-      <div className="h-2 w-4/5 rounded bg-white/25" />
-      <div className="h-2 w-3/5 rounded bg-white/20" />
+      <div className="h-2.5 w-full rounded bg-white/40" />
+      <div className="h-2.5 w-4/5 rounded bg-white/40" />
+      <div className="h-2.5 w-3/5 rounded bg-white/30" />
     </div>
-    <div className="mt-3 flex items-center gap-3 text-white/40">
-      <Heart className="h-3 w-3" />
-      <MessageCircle className="h-3 w-3" />
-      <Share2 className="h-3 w-3" />
+    <div className="mt-3 flex items-center gap-4 text-white/60">
+      <Heart className="h-3.5 w-3.5" />
+      <MessageCircle className="h-3.5 w-3.5" />
+      <Share2 className="h-3.5 w-3.5" />
     </div>
   </motion.div>
 );
@@ -61,27 +63,29 @@ const LinkedInPost = ({ className }: { className?: string }) => (
 const XPost = ({ className }: { className?: string }) => (
   <motion.div
     initial={{ opacity: 0, y: -20 }}
-    animate={{ opacity: 0.15, y: 0 }}
+    animate={{ opacity: 0.7, y: 0 }}
     transition={{ duration: 0.8, delay: 0.6 }}
-    className={`absolute w-44 rounded-xl border border-white/20 bg-white/10 p-3 backdrop-blur-sm ${className}`}
+    className={`absolute w-48 rounded-xl border border-white/30 bg-white/20 p-3 shadow-xl backdrop-blur-md ${className}`}
   >
     <div className="flex items-start gap-2">
-      <div className="h-5 w-5 rounded-full bg-white/30" />
+      <div className="h-6 w-6 rounded-full bg-white/50" />
       <div className="flex-1">
-        <div className="flex items-center gap-1">
-          <div className="h-2 w-12 rounded bg-white/30" />
-          <XIcon />
+        <div className="flex items-center gap-2">
+          <div className="h-2.5 w-16 rounded bg-white/50" />
+          <div className="text-white/80">
+            <XIcon />
+          </div>
         </div>
-        <div className="mt-2 space-y-1">
-          <div className="h-1.5 w-full rounded bg-white/25" />
-          <div className="h-1.5 w-full rounded bg-white/25" />
-          <div className="h-1.5 w-2/3 rounded bg-white/20" />
+        <div className="mt-2 space-y-1.5">
+          <div className="h-2 w-full rounded bg-white/40" />
+          <div className="h-2 w-full rounded bg-white/40" />
+          <div className="h-2 w-2/3 rounded bg-white/30" />
         </div>
-        <div className="mt-2 flex items-center gap-4 text-white/40">
-          <MessageCircle className="h-2.5 w-2.5" />
-          <Share2 className="h-2.5 w-2.5" />
-          <Heart className="h-2.5 w-2.5" />
-          <Bookmark className="h-2.5 w-2.5" />
+        <div className="mt-3 flex items-center gap-4 text-white/60">
+          <MessageCircle className="h-3 w-3" />
+          <Share2 className="h-3 w-3" />
+          <Heart className="h-3 w-3" />
+          <Bookmark className="h-3 w-3" />
         </div>
       </div>
     </div>
@@ -91,23 +95,23 @@ const XPost = ({ className }: { className?: string }) => (
 const ReelPost = ({ className }: { className?: string }) => (
   <motion.div
     initial={{ opacity: 0, x: 20 }}
-    animate={{ opacity: 0.15, x: 0 }}
+    animate={{ opacity: 0.7, x: 0 }}
     transition={{ duration: 0.8, delay: 0.7 }}
-    className={`absolute w-28 rounded-xl border border-white/20 bg-white/10 p-2 backdrop-blur-sm ${className}`}
+    className={`absolute w-32 rounded-xl border border-white/30 bg-white/20 p-2.5 shadow-xl backdrop-blur-md ${className}`}
   >
-    <div className="relative aspect-[9/16] rounded-lg bg-white/10">
+    <div className="relative aspect-[9/16] rounded-lg bg-white/20">
       <div className="absolute inset-0 flex items-center justify-center">
-        <Play className="h-6 w-6 text-white/30" fill="currentColor" />
+        <Play className="h-8 w-8 text-white/50" fill="currentColor" />
       </div>
-      <div className="absolute right-1 top-1">
+      <div className="absolute right-1.5 top-1.5 text-white/80">
         <InstagramIcon />
       </div>
     </div>
-    <div className="mt-2 flex items-center justify-between text-white/40">
-      <Heart className="h-3 w-3" />
-      <MessageCircle className="h-3 w-3" />
-      <Share2 className="h-3 w-3" />
-      <MoreHorizontal className="h-3 w-3" />
+    <div className="mt-2 flex items-center justify-between text-white/60">
+      <Heart className="h-3.5 w-3.5" />
+      <MessageCircle className="h-3.5 w-3.5" />
+      <Share2 className="h-3.5 w-3.5" />
+      <MoreHorizontal className="h-3.5 w-3.5" />
     </div>
   </motion.div>
 );
@@ -115,21 +119,21 @@ const ReelPost = ({ className }: { className?: string }) => (
 const TikTokPost = ({ className }: { className?: string }) => (
   <motion.div
     initial={{ opacity: 0, x: -20 }}
-    animate={{ opacity: 0.15, x: 0 }}
+    animate={{ opacity: 0.7, x: 0 }}
     transition={{ duration: 0.8, delay: 0.8 }}
-    className={`absolute w-28 rounded-xl border border-white/20 bg-white/10 p-2 backdrop-blur-sm ${className}`}
+    className={`absolute w-32 rounded-xl border border-white/30 bg-white/20 p-2.5 shadow-xl backdrop-blur-md ${className}`}
   >
-    <div className="relative aspect-[9/16] rounded-lg bg-white/10">
+    <div className="relative aspect-[9/16] rounded-lg bg-white/20">
       <div className="absolute inset-0 flex items-center justify-center">
-        <Play className="h-6 w-6 text-white/30" fill="currentColor" />
+        <Play className="h-8 w-8 text-white/50" fill="currentColor" />
       </div>
-      <div className="absolute right-1 top-1">
+      <div className="absolute right-1.5 top-1.5 text-white/80">
         <TikTokIcon />
       </div>
     </div>
     <div className="mt-2 flex items-center gap-2">
-      <div className="h-4 w-4 rounded-full bg-white/30" />
-      <div className="h-1.5 w-12 rounded bg-white/25" />
+      <div className="h-5 w-5 rounded-full bg-white/50" />
+      <div className="h-2 w-14 rounded bg-white/40" />
     </div>
   </motion.div>
 );
@@ -155,10 +159,10 @@ const CTASection = () => {
 
           {/* Floating Platform Posts - Hidden on mobile for cleaner look */}
           <div className="pointer-events-none hidden lg:block">
-            <LinkedInPost className="-left-4 top-8 -rotate-6" />
-            <XPost className="-right-2 top-4 rotate-6" />
-            <ReelPost className="-bottom-4 left-16 rotate-3" />
-            <TikTokPost className="-bottom-2 right-20 -rotate-3" />
+            <LinkedInPost className="left-3 top-3 -rotate-3" />
+            <XPost className="right-3 top-3 rotate-3" />
+            <ReelPost className="bottom-3 left-4 rotate-2" />
+            <TikTokPost className="bottom-3 right-4 -rotate-2" />
           </div>
 
           <div className="relative mx-auto max-w-2xl text-center">
