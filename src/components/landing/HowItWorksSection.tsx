@@ -32,7 +32,7 @@ const HowItWorksSection = () => {
   return (
     <section id="how-it-works" ref={ref} className="relative border-t border-border py-24 sm:py-32">
       {/* Background accent */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,hsl(217,91%,60%,0.05),transparent_70%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,hsl(199,89%,48%,0.04),transparent_70%)]" />
 
       <div className="container relative mx-auto px-4">
         <motion.div

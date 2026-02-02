@@ -29,7 +29,7 @@ const FeaturesSection = () => {
   return (
     <section ref={ref} className="relative border-t border-border py-24 sm:py-32">
       {/* Background */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,hsl(174,100%,50%,0.05),transparent_70%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,hsl(187,92%,42%,0.04),transparent_70%)]" />
 
       <div className="container relative mx-auto px-4">
         <motion.div

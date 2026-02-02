@@ -11,8 +11,8 @@ const CTASection = () => {
   return (
     <section ref={ref} className="relative border-t border-border py-24 sm:py-32">
       {/* Background Effects */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,hsl(217,91%,60%,0.12),transparent_60%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,hsl(174,100%,50%,0.08),transparent_60%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,hsl(199,89%,48%,0.06),transparent_60%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,hsl(187,92%,42%,0.04),transparent_60%)]" />
 
       <div className="container relative mx-auto px-4">
         <motion.div

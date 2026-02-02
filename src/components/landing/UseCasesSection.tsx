@@ -35,7 +35,7 @@ const UseCasesSection = () => {
 
   return (
     <section ref={ref} className="relative border-t border-border py-24 sm:py-32">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,hsl(217,91%,60%,0.08),transparent_50%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,hsl(199,89%,48%,0.05),transparent_50%)]" />
 
       <div className="container relative mx-auto px-4">
         <motion.div
