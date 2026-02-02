@@ -6,6 +6,8 @@ import { Check, ArrowRight, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { getSafeErrorMessage } from "@/lib/errors";
+import { onboardingSchema, VALID_GOALS, VALID_PLATFORMS, VALID_EXPERIENCE_LEVELS } from "@/lib/validation";
 
 const goals = [
   { value: "build_in_public", label: "Build in public", description: "Share your journey openly" },
@@ -75,14 +77,31 @@ const Onboarding = () => {
   const handleComplete = async () => {
     if (!user) return;
 
+    // Validate onboarding data before submitting
+    const validation = onboardingSchema.safeParse({
+      primaryGoal,
+      platforms: selectedPlatforms,
+      experienceLevel,
+    });
+
+    if (!validation.success) {
+      const firstError = validation.error.errors[0];
+      toast({
+        title: "Validation Error",
+        description: firstError.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const { error } = await supabase
         .from("users")
         .update({
-          primary_goal: primaryGoal,
-          platforms: selectedPlatforms,
-          experience_level: experienceLevel,
+          primary_goal: validation.data.primaryGoal,
+          platforms: validation.data.platforms,
+          experience_level: validation.data.experienceLevel,
           onboarding_completed: true,
           updated_at: new Date().toISOString(),
         })
@@ -96,10 +115,10 @@ const Onboarding = () => {
       });
 
       navigate("/dashboard");
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error",
-        description: error.message || "Failed to save preferences",
+        description: getSafeErrorMessage(error),
         variant: "destructive",
       });
     } finally {

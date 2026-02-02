@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { getSafeErrorMessage } from "@/lib/errors";
 
 const GoogleIcon = () => (
   <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -63,17 +64,17 @@ const Login = () => {
       if (error) {
         toast({
           title: "Sign in failed",
-          description: error.message,
+          description: getSafeErrorMessage(error),
           variant: "destructive",
         });
         return;
       }
 
       navigate("/dashboard");
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error",
-        description: error.message || "An unexpected error occurred",
+        description: getSafeErrorMessage(error),
         variant: "destructive",
       });
     } finally {
@@ -88,14 +89,14 @@ const Login = () => {
       if (error) {
         toast({
           title: "Google sign in failed",
-          description: error.message,
+          description: getSafeErrorMessage(error),
           variant: "destructive",
         });
       }
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error",
-        description: error.message || "An unexpected error occurred",
+        description: getSafeErrorMessage(error),
         variant: "destructive",
       });
     } finally {
