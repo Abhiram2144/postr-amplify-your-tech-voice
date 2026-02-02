@@ -4,14 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Check, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 
 const plans = [
   {
@@ -23,6 +15,17 @@ const plans = [
     variant: "heroOutline" as const,
     highlighted: false,
     bestFor: "Trying",
+    features: [
+      "5–10 monthly generations",
+      "1–2 video uploads",
+      "Text input",
+      "Video → transcript",
+      "Basic content analysis",
+      "Basic psychological hooks",
+      "All platforms (limited)",
+      "Limited project history",
+      "Standard processing speed",
+    ],
   },
   {
     name: "Creator",
@@ -33,6 +36,17 @@ const plans = [
     variant: "heroOutline" as const,
     highlighted: false,
     bestFor: "Growing",
+    features: [
+      "100–200 monthly generations",
+      "20–30 video uploads",
+      "Text input",
+      "Video → transcript",
+      "Advanced content analysis",
+      "Advanced psychological hooks",
+      "Unlimited platform exports",
+      "Full project history",
+      "Fast processing speed",
+    ],
   },
   {
     name: "Pro",
@@ -43,29 +57,21 @@ const plans = [
     variant: "hero" as const,
     highlighted: true,
     bestFor: "Scaling",
+    features: [
+      "Unlimited generations",
+      "Unlimited video uploads",
+      "Text input",
+      "Video → transcript",
+      "Deep content analysis",
+      "Advanced + Variants hooks",
+      "Unlimited platform exports",
+      "Full project history",
+      "Priority processing speed",
+    ],
   },
 ];
 
-const features = [
-  { name: "Monthly generations", free: "5–10", creator: "100–200", pro: "Unlimited" },
-  { name: "Video uploads", free: "1–2", creator: "20–30", pro: "Unlimited" },
-  { name: "Text input", free: true, creator: true, pro: true },
-  { name: "Video → transcript", free: true, creator: true, pro: true },
-  { name: "Content analysis", free: "Basic", creator: "Advanced", pro: "Deep" },
-  { name: "Psychological hooks", free: "Basic", creator: "Advanced", pro: "Advanced + Variants" },
-  { name: "Platform exports", free: "All (limited)", creator: "Unlimited", pro: "Unlimited" },
-  { name: "Project history", free: "Limited", creator: "Full", pro: "Full" },
-  { name: "Processing speed", free: "Standard", creator: "Fast", pro: "Priority" },
-];
-
 const Pricing = () => {
-  const renderFeatureValue = (value: boolean | string) => {
-    if (value === true) {
-      return <Check className="mx-auto h-5 w-5 text-primary" />;
-    }
-    return <span>{value}</span>;
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -85,7 +91,6 @@ const Pricing = () => {
             </p>
           </motion.div>
 
-          {/* Plan Cards */}
           <div className="mx-auto mt-16 grid max-w-5xl gap-6 md:grid-cols-3">
             {plans.map((plan, index) => (
               <motion.div
@@ -115,9 +120,18 @@ const Pricing = () => {
                 <p className="mt-2 text-sm text-muted-foreground">
                   {plan.description}
                 </p>
-                <p className="mt-4 text-sm font-medium">
+                <p className="mt-2 text-sm font-medium">
                   Best for: <span className="text-primary">{plan.bestFor}</span>
                 </p>
+
+                <ul className="mt-6 space-y-3">
+                  {plan.features.map((feature, i) => (
+                    <li key={i} className="flex items-start gap-3 text-sm">
+                      <Check className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
+                      <span className="text-muted-foreground">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
 
                 <Button
                   variant={plan.variant}
@@ -133,46 +147,6 @@ const Pricing = () => {
               </motion.div>
             ))}
           </div>
-
-          {/* Feature Comparison Table */}
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="mx-auto mt-16 max-w-5xl"
-          >
-            <h2 className="mb-8 text-center text-2xl font-bold">
-              Compare <span className="gradient-text">features</span>
-            </h2>
-            <div className="rounded-xl border border-border bg-card overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-border hover:bg-transparent">
-                    <TableHead className="w-[40%] text-foreground font-bold">Feature</TableHead>
-                    <TableHead className="text-center text-foreground font-bold">Free</TableHead>
-                    <TableHead className="text-center text-foreground font-bold">Creator</TableHead>
-                    <TableHead className="text-center text-foreground font-bold bg-primary/5">Pro</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {features.map((feature, index) => (
-                    <TableRow key={index} className="border-border">
-                      <TableCell className="font-medium">{feature.name}</TableCell>
-                      <TableCell className="text-center text-muted-foreground">
-                        {renderFeatureValue(feature.free)}
-                      </TableCell>
-                      <TableCell className="text-center text-muted-foreground">
-                        {renderFeatureValue(feature.creator)}
-                      </TableCell>
-                      <TableCell className="text-center bg-primary/5">
-                        {renderFeatureValue(feature.pro)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </motion.div>
 
           <motion.p
             initial={{ opacity: 0 }}
