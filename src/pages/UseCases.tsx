@@ -77,27 +77,35 @@ const UseCases = () => {
   };
 
   const getCardStyle = (index: number) => {
-    const diff = index - activeIndex;
-    const normalizedDiff = ((diff + useCases.length) % useCases.length);
+    const total = useCases.length;
+    let diff = index - activeIndex;
     
-    // Handle wrapping for visual display
-    let visualDiff = diff;
-    if (normalizedDiff > useCases.length / 2) {
-      visualDiff = diff - useCases.length;
-    } else if (normalizedDiff < -useCases.length / 2) {
-      visualDiff = diff + useCases.length;
+    // Wrap around for seamless carousel
+    if (diff > total / 2) {
+      diff -= total;
+    } else if (diff < -total / 2) {
+      diff += total;
     }
 
-    const isActive = index === activeIndex;
-    const isNeighbor = Math.abs(visualDiff) === 1;
-    const isHidden = Math.abs(visualDiff) > 1;
+    const isActive = diff === 0;
+    const isLeftNeighbor = diff === -1 || (activeIndex === 0 && index === total - 1);
+    const isRightNeighbor = diff === 1 || (activeIndex === total - 1 && index === 0);
+    const isNeighbor = isLeftNeighbor || isRightNeighbor;
+
+    // Recalculate visual position for neighbors at edges
+    let visualX = diff * 180;
+    if (activeIndex === 0 && index === total - 1) {
+      visualX = -180;
+    } else if (activeIndex === total - 1 && index === 0) {
+      visualX = 180;
+    }
 
     return {
       opacity: isActive ? 1 : isNeighbor ? 0.5 : 0,
       scale: isActive ? 1 : isNeighbor ? 0.85 : 0.7,
-      x: visualDiff * 180,
+      x: visualX,
       zIndex: isActive ? 10 : isNeighbor ? 5 : 0,
-      display: isHidden ? "none" : "flex",
+      display: isActive || isNeighbor ? "flex" : "none",
     };
   };
 
