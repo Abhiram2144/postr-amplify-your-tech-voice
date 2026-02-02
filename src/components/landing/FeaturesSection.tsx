@@ -183,7 +183,7 @@ const FeaturesSection = () => {
         delay: 0.8
       }} className="mx-auto mt-16 max-w-5xl">
           <div className="text-center">
-            <span className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1 text-sm font-medium text-primary text-[\"#944dff\"] ">
+            <span className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1 text-sm font-medium text-primary ">
               <Sparkles className="h-4 w-4" />
               Short-Form Video Scripts
             </span>
