@@ -6,12 +6,12 @@ import { Link } from "react-router-dom";
 const HeroSection = () => {
   return (
     <section className="relative min-h-screen overflow-hidden pt-16">
-      {/* Background Effects */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,hsl(217,91%,60%,0.15),transparent_50%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,hsl(174,100%,50%,0.1),transparent_50%)]" />
+      {/* Background Effects - Light theme */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,hsl(199,89%,48%,0.08),transparent_50%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,hsl(187,92%,42%,0.06),transparent_50%)]" />
       
       {/* Grid pattern */}
-      <div className="absolute inset-0 bg-[linear-gradient(hsl(222,47%,15%,0.3)_1px,transparent_1px),linear-gradient(90deg,hsl(222,47%,15%,0.3)_1px,transparent_1px)] bg-[size:64px_64px]" />
+      <div className="absolute inset-0 bg-[linear-gradient(hsl(214,32%,91%,0.5)_1px,transparent_1px),linear-gradient(90deg,hsl(214,32%,91%,0.5)_1px,transparent_1px)] bg-[size:64px_64px]" />
 
       <div className="container relative mx-auto flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center px-4 py-20 text-center">
         {/* Badge */}
