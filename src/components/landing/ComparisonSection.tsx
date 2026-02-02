@@ -4,27 +4,33 @@ import { Check, X, Minus } from "lucide-react";
 
 const comparisonData = {
   features: [
-    "Built for tech creators",
-    "Video understanding",
-    "Content quality analysis",
-    "Improvement advice",
-    "Platform-specific formatting",
-    "LinkedIn + X + Threads + Reddit",
-    "Strategy before generation",
-    "No-cringe, no-fluff output",
+    "Transcription",
+    "Structured Content Scoring",
+    "Narrative Improvement / Advice",
+    "Platform-Specific Post Generation",
+    "Tech-Audience Optimization",
+    "Built for Thought Leadership",
   ],
   competitors: [
     {
-      name: "Generic AI Writers",
-      values: ["no", "no", "no", "no", "partial", "partial", "no", "no"],
+      name: "Castmagic",
+      values: ["yes", "no", "no", "basic", "no", "no"],
     },
     {
-      name: "Repurposing Tools",
-      values: ["no", "partial", "no", "no", "partial", "no", "no", "no"],
+      name: "Repurpose.io",
+      values: ["no", "no", "no", "no", "no", "no"],
     },
     {
-      name: "Social Schedulers",
-      values: ["no", "no", "no", "no", "no", "partial", "no", "no"],
+      name: "Quso.ai",
+      values: ["yes", "no", "no", "visual", "no", "no"],
+    },
+    {
+      name: "Predis.ai",
+      values: ["no", "no", "no", "generic", "no", "no"],
+    },
+    {
+      name: "Typical Social Tools",
+      values: ["no", "limited", "no", "limited", "no", "no"],
     },
   ],
 };
@@ -44,9 +50,12 @@ const ValueCell = ({ value }: { value: string }) => {
       </div>
     );
   }
+  // For partial values like "basic", "limited", "visual", "generic"
   return (
     <div className="flex items-center justify-center">
-      <Minus className="h-5 w-5 text-muted-foreground/40" />
+      <span className="rounded bg-muted px-2 py-0.5 text-xs font-medium capitalize text-muted-foreground">
+        {value}
+      </span>
     </div>
   );
 };
@@ -68,8 +77,7 @@ const ComparisonSection = () => {
             Comparison
           </span>
           <h2 className="mt-6 text-3xl font-bold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
-            Why Postr instead of{" "}
-            <span className="gradient-text">generic AI tools?</span>
+            How Postr <span className="gradient-text">Stands Out</span>
           </h2>
         </motion.div>
 
@@ -77,9 +85,9 @@ const ComparisonSection = () => {
           initial={{ opacity: 0, y: 40 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6, delay: 0.2 }}
-          className="mx-auto mt-16 max-w-5xl overflow-x-auto rounded-2xl border border-border bg-card shadow-sm"
+          className="mx-auto mt-16 max-w-6xl overflow-x-auto rounded-2xl border border-border bg-card shadow-sm"
         >
-          <table className="w-full min-w-[700px]">
+          <table className="w-full min-w-[900px]">
             <thead>
               <tr className="border-b border-border bg-secondary/50">
                 <th className="p-4 text-left text-sm font-semibold text-foreground">
