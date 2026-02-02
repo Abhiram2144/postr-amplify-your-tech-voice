@@ -46,15 +46,24 @@ const TikTokIcon = () => (
   </svg>
 );
 
+// Calculate ring positions for 7 icons
+const ringRadius = 140;
 const floatingPlatforms = [
-  { icon: LinkedInIcon, color: "text-[#0A66C2]", initialX: -120, initialY: -80 },
-  { icon: XIcon, color: "text-foreground", initialX: 100, initialY: -100 },
-  { icon: ThreadsIcon, color: "text-foreground", initialX: 130, initialY: 20 },
-  { icon: RedditIcon, color: "text-[#FF4500]", initialX: -100, initialY: 90 },
-  { icon: InstagramIcon, color: "text-[#E4405F]", initialX: 80, initialY: 110 },
-  { icon: YouTubeIcon, color: "text-[#FF0000]", initialX: -140, initialY: 10 },
-  { icon: TikTokIcon, color: "text-foreground", initialX: 10, initialY: -120 },
-];
+  { icon: LinkedInIcon, color: "text-[#0A66C2]" },
+  { icon: XIcon, color: "text-foreground" },
+  { icon: ThreadsIcon, color: "text-foreground" },
+  { icon: RedditIcon, color: "text-[#FF4500]" },
+  { icon: InstagramIcon, color: "text-[#E4405F]" },
+  { icon: YouTubeIcon, color: "text-[#FF0000]" },
+  { icon: TikTokIcon, color: "text-foreground" },
+].map((platform, index) => {
+  const angle = (index / 7) * Math.PI * 2 - Math.PI / 2; // Start from top
+  return {
+    ...platform,
+    initialX: Math.cos(angle) * ringRadius,
+    initialY: Math.sin(angle) * ringRadius,
+  };
+});
 
 const painPoints = [
   { icon: Clock, text: "Writing posts takes too much time" },
@@ -197,7 +206,19 @@ const ProblemSection = () => {
             className="relative hidden lg:block"
           >
             <div className="relative aspect-square">
-              {/* Floating platform icons */}
+              {/* Background blue bubbles */}
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
+                className="absolute inset-0"
+              >
+                <div className="absolute left-1/4 top-1/4 h-32 w-32 rounded-full bg-primary/10" />
+                <div className="absolute right-1/4 bottom-1/4 h-24 w-24 rounded-full bg-accent/10" />
+                <div className="absolute left-1/3 bottom-1/3 h-20 w-20 rounded-full bg-primary/8" />
+                <div className="absolute right-1/3 top-1/3 h-16 w-16 rounded-full bg-primary/12" />
+              </motion.div>
+
+              {/* Floating platform icons in a ring */}
               {floatingPlatforms.map((platform, index) => (
                 <FloatingIcon
                   key={index}
