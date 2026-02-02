@@ -1,125 +1,147 @@
 import { Link } from "react-router-dom";
+import { motion, useInView } from "framer-motion";
+import { useRef } from "react";
+import { Linkedin, Twitter, Github } from "lucide-react";
+
+const productLinks = [
+  { label: "Features", href: "/product", isRoute: true },
+  { label: "Use Cases", href: "/use-cases", isRoute: true },
+  { label: "Pricing", href: "/pricing", isRoute: true },
+  { label: "Docs", href: "/docs", isRoute: true },
+];
+
+const companyLinks = [
+  { label: "About", href: "#", isRoute: false },
+  { label: "Blog", href: "#", isRoute: false },
+  { label: "Careers", href: "#", isRoute: false },
+  { label: "Contact", href: "#", isRoute: false },
+];
+
+const legalLinks = [
+  { label: "Privacy", href: "#", isRoute: false },
+  { label: "Terms", href: "#", isRoute: false },
+];
+
+const socialLinks = [
+  { icon: Twitter, href: "#", label: "Twitter" },
+  { icon: Linkedin, href: "#", label: "LinkedIn" },
+  { icon: Github, href: "#", label: "GitHub" },
+];
 
 const Footer = () => {
-  const productLinks = [
-    { label: "Features", href: "/product", isRoute: true },
-    { label: "Use Cases", href: "/use-cases", isRoute: true },
-    { label: "Pricing", href: "/pricing", isRoute: true },
-    { label: "Documentation", href: "/docs", isRoute: true },
-  ];
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: "-50px" });
 
-  const companyLinks = [
-    { label: "About", href: "#about", isRoute: false },
-    { label: "Blog", href: "#blog", isRoute: false },
-    { label: "Careers", href: "#careers", isRoute: false },
-  ];
-
-  const legalLinks = [
-    { label: "Privacy", href: "#privacy", isRoute: false },
-    { label: "Terms", href: "#terms", isRoute: false },
-  ];
-
-  const renderLink = (link: { label: string; href: string; isRoute: boolean }) => {
+  const renderLink = (link: { label: string; href: string; isRoute: boolean }, index: number) => {
+    const className = "text-sm text-muted-foreground transition-colors hover:text-primary";
+    
     if (link.isRoute) {
       return (
-        <Link
-          to={link.href}
-          className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+        <motion.div
+          key={link.label}
+          initial={{ opacity: 0, y: 10 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ delay: 0.1 + index * 0.05 }}
         >
-          {link.label}
-        </Link>
+          <Link to={link.href} className={className}>
+            {link.label}
+          </Link>
+        </motion.div>
       );
     }
     return (
-      <a
-        href={link.href}
-        className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+      <motion.div
+        key={link.label}
+        initial={{ opacity: 0, y: 10 }}
+        animate={isInView ? { opacity: 1, y: 0 } : {}}
+        transition={{ delay: 0.1 + index * 0.05 }}
       >
-        {link.label}
-      </a>
+        <a href={link.href} className={className}>
+          {link.label}
+        </a>
+      </motion.div>
     );
   };
 
   return (
-    <footer className="border-t border-border bg-card/50">
-      <div className="container mx-auto px-4 py-16">
-        <div className="grid gap-12 sm:grid-cols-2 lg:grid-cols-4">
+    <footer ref={ref} className="border-t border-border bg-background py-16">
+      <div className="container mx-auto px-4">
+        <div className="grid gap-12 md:grid-cols-5">
           {/* Brand */}
-          <div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={isInView ? { opacity: 1, y: 0 } : {}}
+            className="md:col-span-2"
+          >
             <Link to="/" className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
                 <span className="text-lg font-black text-primary-foreground">P</span>
               </div>
-              <span className="text-xl font-bold">Postr</span>
+              <span className="text-xl font-bold text-foreground">Postr</span>
             </Link>
-            <p className="mt-4 text-sm text-muted-foreground leading-relaxed">
-              Content intelligence for tech creators. Transform your ideas into
-              high-quality posts across platforms.
+            <p className="mt-4 max-w-xs text-sm text-muted-foreground">
+              Transform your tech ideas into engaging content for LinkedIn, X, Threads,
+              and Reddit.
             </p>
-          </div>
+
+            {/* Social Links */}
+            <div className="mt-6 flex gap-4">
+              {socialLinks.map((social, index) => (
+                <motion.a
+                  key={social.label}
+                  href={social.href}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={isInView ? { opacity: 1, scale: 1 } : {}}
+                  transition={{ delay: 0.3 + index * 0.1 }}
+                  whileHover={{ scale: 1.1, y: -2 }}
+                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary"
+                  aria-label={social.label}
+                >
+                  <social.icon className="h-5 w-5" />
+                </motion.a>
+              ))}
+            </div>
+          </motion.div>
 
           {/* Product Links */}
           <div>
-            <h3 className="font-semibold">Product</h3>
-            <ul className="mt-4 space-y-3">
-              {productLinks.map((link) => (
-                <li key={link.label}>{renderLink(link)}</li>
-              ))}
-            </ul>
+            <h4 className="text-sm font-semibold text-foreground">Product</h4>
+            <div className="mt-4 flex flex-col gap-3">
+              {productLinks.map((link, index) => renderLink(link, index))}
+            </div>
           </div>
 
           {/* Company Links */}
           <div>
-            <h3 className="font-semibold">Company</h3>
-            <ul className="mt-4 space-y-3">
-              {companyLinks.map((link) => (
-                <li key={link.label}>{renderLink(link)}</li>
-              ))}
-            </ul>
+            <h4 className="text-sm font-semibold text-foreground">Company</h4>
+            <div className="mt-4 flex flex-col gap-3">
+              {companyLinks.map((link, index) => renderLink(link, index))}
+            </div>
           </div>
 
           {/* Legal Links */}
           <div>
-            <h3 className="font-semibold">Legal</h3>
-            <ul className="mt-4 space-y-3">
-              {legalLinks.map((link) => (
-                <li key={link.label}>{renderLink(link)}</li>
-              ))}
-            </ul>
+            <h4 className="text-sm font-semibold text-foreground">Legal</h4>
+            <div className="mt-4 flex flex-col gap-3">
+              {legalLinks.map((link, index) => renderLink(link, index))}
+            </div>
           </div>
         </div>
 
-        <div className="mt-16 flex flex-col items-center justify-between gap-4 border-t border-border pt-8 sm:flex-row">
+        {/* Bottom */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={isInView ? { opacity: 1 } : {}}
+          transition={{ delay: 0.5 }}
+          className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-border pt-8 sm:flex-row"
+        >
           <p className="text-sm text-muted-foreground">
             © {new Date().getFullYear()} Postr. All rights reserved.
           </p>
-          <div className="flex items-center gap-6">
-            <a
-              href="https://twitter.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-muted-foreground transition-colors hover:text-foreground"
-            >
-              X
-            </a>
-            <a
-              href="https://linkedin.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-muted-foreground transition-colors hover:text-foreground"
-            >
-              LinkedIn
-            </a>
-            <a
-              href="https://github.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-muted-foreground transition-colors hover:text-foreground"
-            >
-              GitHub
-            </a>
-          </div>
-        </div>
+          <p className="text-sm text-muted-foreground">
+            Built for tech creators, by tech creators.
+          </p>
+        </motion.div>
       </div>
     </footer>
   );

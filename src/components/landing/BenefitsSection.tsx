@@ -45,7 +45,7 @@ const BenefitsSection = () => {
           <span className="inline-block rounded-full border border-accent/30 bg-accent/10 px-4 py-1 text-sm font-medium text-accent">
             Why Postr
           </span>
-          <h2 className="mt-6 text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
+          <h2 className="mt-6 text-3xl font-bold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
             Intelligence that understands{" "}
             <span className="gradient-text">your thinking</span>
           </h2>
@@ -58,18 +58,26 @@ const BenefitsSection = () => {
               initial={{ opacity: 0, y: 30 }}
               animate={isInView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.5, delay: 0.2 + index * 0.1 }}
-              className="group relative overflow-hidden rounded-2xl border border-border bg-card p-8 transition-all duration-300 hover:border-primary/50"
+              whileHover={{ y: -6, scale: 1.02 }}
+              className={`group relative overflow-hidden rounded-2xl border p-8 transition-all duration-300 ${
+                index % 2 === 0
+                  ? "border-primary/20 bg-primary/5 hover:border-primary/40"
+                  : "border-border bg-card hover:border-primary/30"
+              }`}
             >
               {/* Glow effect on hover */}
-              <div className="absolute -inset-px rounded-2xl bg-gradient-to-r from-primary/20 to-accent/20 opacity-0 blur-xl transition-opacity duration-500 group-hover:opacity-100" />
+              <div className="absolute -inset-px rounded-2xl bg-gradient-to-r from-primary/10 to-accent/10 opacity-0 blur-xl transition-opacity duration-500 group-hover:opacity-100" />
 
               <div className="relative">
-                <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+                <motion.div
+                  whileHover={{ rotate: 5, scale: 1.1 }}
+                  className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10"
+                >
                   <benefit.icon className="h-6 w-6 text-primary" />
-                </div>
+                </motion.div>
 
-                <h3 className="mt-6 text-xl font-bold">{benefit.title}</h3>
-                <p className="mt-3 text-muted-foreground leading-relaxed">
+                <h3 className="mt-6 text-xl font-bold text-foreground">{benefit.title}</h3>
+                <p className="mt-3 leading-relaxed text-muted-foreground">
                   {benefit.description}
                 </p>
               </div>

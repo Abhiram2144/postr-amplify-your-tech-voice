@@ -40,13 +40,13 @@ const ValueCell = ({ value }: { value: string }) => {
   if (value === "no") {
     return (
       <div className="flex items-center justify-center">
-        <X className="h-5 w-5 text-muted-foreground/50" />
+        <X className="h-5 w-5 text-muted-foreground/40" />
       </div>
     );
   }
   return (
     <div className="flex items-center justify-center">
-      <Minus className="h-5 w-5 text-muted-foreground/50" />
+      <Minus className="h-5 w-5 text-muted-foreground/40" />
     </div>
   );
 };
@@ -67,7 +67,7 @@ const ComparisonSection = () => {
           <span className="inline-block rounded-full border border-accent/30 bg-accent/10 px-4 py-1 text-sm font-medium text-accent">
             Comparison
           </span>
-          <h2 className="mt-6 text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
+          <h2 className="mt-6 text-3xl font-bold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
             Why Postr instead of{" "}
             <span className="gradient-text">generic AI tools?</span>
           </h2>
@@ -77,24 +77,24 @@ const ComparisonSection = () => {
           initial={{ opacity: 0, y: 40 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6, delay: 0.2 }}
-          className="mx-auto mt-16 max-w-5xl overflow-x-auto"
+          className="mx-auto mt-16 max-w-5xl overflow-x-auto rounded-2xl border border-border bg-card shadow-sm"
         >
-          <table className="w-full min-w-[600px]">
+          <table className="w-full min-w-[700px]">
             <thead>
-              <tr className="border-b border-border">
-                <th className="pb-4 text-left text-sm font-medium text-muted-foreground">
+              <tr className="border-b border-border bg-secondary/50">
+                <th className="p-4 text-left text-sm font-semibold text-foreground">
                   Feature
                 </th>
                 {comparisonData.competitors.map((competitor) => (
                   <th
                     key={competitor.name}
-                    className="pb-4 text-center text-sm font-medium text-muted-foreground"
+                    className="p-4 text-center text-sm font-medium text-muted-foreground"
                   >
                     {competitor.name}
                   </th>
                 ))}
-                <th className="pb-4 text-center">
-                  <span className="rounded-lg bg-primary px-3 py-1 text-sm font-bold text-primary-foreground">
+                <th className="bg-primary/10 p-4 text-center">
+                  <span className="rounded-lg bg-primary px-3 py-1.5 text-sm font-bold text-primary-foreground">
                     Postr
                   </span>
                 </th>
@@ -104,18 +104,18 @@ const ComparisonSection = () => {
               {comparisonData.features.map((feature, rowIndex) => (
                 <motion.tr
                   key={feature}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={isInView ? { opacity: 1, x: 0 } : {}}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={isInView ? { opacity: 1, y: 0 } : {}}
                   transition={{ duration: 0.4, delay: 0.3 + rowIndex * 0.05 }}
-                  className="border-b border-border/50"
+                  className="group border-b border-border/50 transition-colors hover:bg-secondary/30"
                 >
-                  <td className="py-4 text-sm font-medium">{feature}</td>
+                  <td className="p-4 text-sm font-medium text-foreground">{feature}</td>
                   {comparisonData.competitors.map((competitor) => (
-                    <td key={competitor.name} className="py-4">
+                    <td key={competitor.name} className="p-4">
                       <ValueCell value={competitor.values[rowIndex]} />
                     </td>
                   ))}
-                  <td className="py-4 bg-primary/5">
+                  <td className="bg-primary/5 p-4 transition-colors group-hover:bg-primary/10">
                     <div className="flex items-center justify-center">
                       <Check className="h-5 w-5 text-primary" />
                     </div>
