@@ -11,32 +11,63 @@ const plans = [
     price: "$0",
     period: "forever",
     description: "Perfect for trying out Postr",
-    features: [
-      "5 content generations/month",
-      "Basic content analysis",
-      "LinkedIn & X formats",
-      "Community support",
-    ],
     cta: "Get started",
     variant: "heroOutline" as const,
     highlighted: false,
+    bestFor: "Trying",
+    features: [
+      "5–10 monthly generations",
+      "1–2 video uploads",
+      "Text input",
+      "Video → transcript",
+      "Basic content analysis",
+      "Basic psychological hooks",
+      "All platforms (limited)",
+      "Limited project history",
+      "Standard processing speed",
+    ],
   },
   {
-    name: "Pro",
-    price: "$19",
+    name: "Creator",
+    price: "$14",
     period: "/month",
-    description: "For serious content creators",
-    features: [
-      "Unlimited generations",
-      "Advanced content analysis",
-      "All platforms (LinkedIn, X, Threads, Reddit)",
-      "Video to transcript",
-      "Priority support",
-      "Custom tone settings",
-    ],
+    description: "For growing content creators",
     cta: "Start free trial",
     variant: "hero" as const,
     highlighted: true,
+    bestFor: "Growing",
+    features: [
+      "100–200 monthly generations",
+      "20–30 video uploads",
+      "Text input",
+      "Video → transcript",
+      "Advanced content analysis",
+      "Advanced psychological hooks",
+      "Unlimited platform exports",
+      "Full project history",
+      "Fast processing speed",
+    ],
+  },
+  {
+    name: "Pro",
+    price: "$29",
+    period: "/month",
+    description: "For serious content creators",
+    cta: "Start free trial",
+    variant: "heroOutline" as const,
+    highlighted: false,
+    bestFor: "Scaling",
+    features: [
+      "Unlimited generations",
+      "Unlimited video uploads",
+      "Text input",
+      "Video → transcript",
+      "Deep content analysis",
+      "Advanced + Variants hooks",
+      "Unlimited platform exports",
+      "Full project history",
+      "Priority processing speed",
+    ],
   },
 ];
 
@@ -51,10 +82,7 @@ const Pricing = () => {
             animate={{ opacity: 1, y: 0 }}
             className="mx-auto max-w-3xl text-center"
           >
-            <span className="inline-block rounded-full border border-primary/30 bg-primary/10 px-4 py-1 text-sm font-medium text-primary">
-              Pricing
-            </span>
-            <h1 className="mt-6 text-4xl font-black tracking-tight sm:text-5xl">
+            <h1 className="text-4xl font-black tracking-tight sm:text-5xl">
               Simple, transparent{" "}
               <span className="gradient-text">pricing</span>
             </h1>
@@ -63,14 +91,14 @@ const Pricing = () => {
             </p>
           </motion.div>
 
-          <div className="mx-auto mt-16 grid max-w-4xl gap-8 lg:grid-cols-2">
+          <div className="mx-auto mt-16 grid max-w-5xl gap-6 md:grid-cols-3">
             {plans.map((plan, index) => (
               <motion.div
                 key={index}
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 + index * 0.1 }}
-                className={`relative rounded-2xl border p-8 ${
+                className={`relative rounded-2xl border p-6 ${
                   plan.highlighted
                     ? "border-primary bg-card shadow-lg shadow-primary/10"
                     : "border-border bg-card"
@@ -92,12 +120,15 @@ const Pricing = () => {
                 <p className="mt-2 text-sm text-muted-foreground">
                   {plan.description}
                 </p>
+                <p className="mt-2 text-sm font-medium">
+                  Best for: <span className="text-primary">{plan.bestFor}</span>
+                </p>
 
-                <ul className="mt-8 space-y-4">
+                <ul className="mt-6 space-y-3">
                   {plan.features.map((feature, i) => (
-                    <li key={i} className="flex items-center gap-3 text-sm">
-                      <Check className="h-5 w-5 text-primary" />
-                      {feature}
+                    <li key={i} className="flex items-start gap-3 text-sm">
+                      <Check className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
+                      <span className="text-muted-foreground">{feature}</span>
                     </li>
                   ))}
                 </ul>
@@ -105,7 +136,7 @@ const Pricing = () => {
                 <Button
                   variant={plan.variant}
                   size="lg"
-                  className="mt-8 w-full"
+                  className="mt-6 w-full"
                   asChild
                 >
                   <Link to="/signup">

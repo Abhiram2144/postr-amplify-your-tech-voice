@@ -44,32 +44,39 @@ const features = [{
 const textPlatforms = [{
   icon: LinkedInIcon,
   name: "LinkedIn posts",
-  color: "text-[#0A66C2]"
+  color: "text-[#0A66C2]",
+  hoverBg: "hover:bg-[#0A66C2]/10"
 }, {
   icon: XIcon,
   name: "X threads",
-  color: "text-foreground"
+  color: "text-foreground",
+  hoverBg: "hover:bg-foreground/10"
 }, {
   icon: ThreadsIcon,
   name: "Threads posts",
-  color: "text-foreground"
+  color: "text-foreground",
+  hoverBg: "hover:bg-foreground/10"
 }, {
   icon: RedditIcon,
   name: "Reddit discussions",
-  color: "text-[#FF4500]"
+  color: "text-[#FF4500]",
+  hoverBg: "hover:bg-[#FF4500]/10"
 }];
 const videoPlatforms = [{
   icon: InstagramIcon,
   name: "Instagram Reels",
-  color: "text-[#E4405F]"
+  color: "text-[#E4405F]",
+  hoverBg: "hover:bg-[#E4405F]/10"
 }, {
   icon: YouTubeIcon,
   name: "YouTube Shorts",
-  color: "text-[#FF0000]"
+  color: "text-[#FF0000]",
+  hoverBg: "hover:bg-[#FF0000]/10"
 }, {
   icon: TikTokIcon,
   name: "TikTok scripts",
-  color: "text-foreground"
+  color: "text-foreground",
+  hoverBg: "hover:bg-foreground/10"
 }];
 const FeaturesSection = () => {
   const ref = useRef(null);
@@ -98,7 +105,7 @@ const FeaturesSection = () => {
         </motion.div>
 
         {/* Main Features - Alternating Layout */}
-        <div className="mx-auto mt-16 max-w-5xl space-y-16">
+        <div className="mx-auto mt-16 max-w-5xl space-y-20">
           {features.map((feature, index) => <motion.div key={index} initial={{
           opacity: 0,
           x: index % 2 === 0 ? -40 : 40
@@ -108,18 +115,21 @@ const FeaturesSection = () => {
         } : {}} transition={{
           duration: 0.6,
           delay: 0.2 + index * 0.1
-        }} className={`flex flex-col items-center gap-8 md:flex-row ${index % 2 === 1 ? "md:flex-row-reverse" : ""}`}>
-              {/* Feature Visual */}
-              <motion.div whileHover={{
-            scale: 1.05
-          }} className="flex h-48 w-full items-center justify-center rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 to-accent/5 md:w-1/2">
-                <feature.icon className="h-20 w-20 text-primary/60" />
+        }} className={`flex flex-col items-center gap-10 md:flex-row ${index % 2 === 1 ? "md:flex-row-reverse" : ""}`}>
+              {/* Feature Visual - Placeholder for images */}
+              <motion.div 
+                whileHover={{ scale: 1.02 }}
+                className="relative flex h-56 w-full items-center justify-center overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-muted/50 to-muted md:w-1/2"
+              >
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,hsl(var(--primary)/0.08),transparent_70%)]" />
+                <feature.icon className="h-16 w-16 text-primary/40" />
+                <span className="absolute bottom-4 text-xs text-muted-foreground/60">Image placeholder</span>
               </motion.div>
 
               {/* Feature Content */}
               <div className="w-full text-center md:w-1/2 md:text-left">
-                <h3 className="text-2xl font-bold text-foreground">{feature.title}</h3>
-                <p className="mt-3 text-lg text-muted-foreground">{feature.description}</p>
+                <h3 className="text-2xl font-bold tracking-tight text-foreground lg:text-3xl">{feature.title}</h3>
+                <p className="mt-4 text-lg leading-relaxed text-muted-foreground">{feature.description}</p>
               </div>
             </motion.div>)}
         </div>
@@ -157,7 +167,7 @@ const FeaturesSection = () => {
           }} whileHover={{
             y: -4,
             scale: 1.02
-          }} className="group flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-6 text-center transition-all duration-300 hover:border-primary/30 hover:shadow-lg">
+          }} className={`group flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-6 text-center transition-all duration-300 hover:border-transparent hover:shadow-lg ${platform.hoverBg}`}>
                 <div className={`${platform.color} transition-transform group-hover:scale-110`}>
                   <platform.icon />
                 </div>
@@ -201,7 +211,7 @@ const FeaturesSection = () => {
           }} whileHover={{
             y: -4,
             scale: 1.02
-          }} className="group flex flex-col items-center gap-3 rounded-xl border border-border bg-gradient-to-br from-card to-secondary/50 p-8 text-center transition-all duration-300 hover:border-primary/30 hover:shadow-lg">
+          }} className={`group flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-8 text-center transition-all duration-300 hover:border-transparent hover:shadow-lg ${platform.hoverBg}`}>
                 <div className={`${platform.color} transition-transform group-hover:scale-110`}>
                   <platform.icon />
                 </div>
