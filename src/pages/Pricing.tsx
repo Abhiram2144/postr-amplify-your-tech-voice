@@ -33,8 +33,8 @@ const plans = [
     period: "/month",
     description: "For growing content creators",
     cta: "Start free trial",
-    variant: "heroOutline" as const,
-    highlighted: false,
+    variant: "hero" as const,
+    highlighted: true,
     bestFor: "Growing",
     features: [
       "100–200 monthly generations",
@@ -54,8 +54,8 @@ const plans = [
     period: "/month",
     description: "For serious content creators",
     cta: "Start free trial",
-    variant: "hero" as const,
-    highlighted: true,
+    variant: "heroOutline" as const,
+    highlighted: false,
     bestFor: "Scaling",
     features: [
       "Unlimited generations",
