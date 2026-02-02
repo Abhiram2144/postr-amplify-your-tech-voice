@@ -38,9 +38,14 @@ const Header = () => {
         <Link to="/" className="flex items-center gap-2">
           <motion.div
             whileHover={{ scale: 1.05 }}
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary"
+            className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg"
           >
-            <span className="text-lg font-black text-primary-foreground">P</span>
+            <img
+              src="/favicons/favicon.svg"
+              alt="Postr"
+              className="h-full w-full object-cover"
+              loading="eager"
+            />
           </motion.div>
           <span className="text-xl font-bold text-foreground">Postr</span>
         </Link>
