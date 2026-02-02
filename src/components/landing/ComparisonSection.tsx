@@ -1,6 +1,6 @@
 import { motion, useInView } from "framer-motion";
 import { useRef } from "react";
-import { Check, X, Minus } from "lucide-react";
+import { Check, X } from "lucide-react";
 
 const comparisonData = {
   features: [
@@ -33,6 +33,23 @@ const comparisonData = {
       values: ["no", "limited", "no", "limited", "no", "no"],
     },
   ],
+};
+
+// Competitor logos as simple styled text badges
+const CompetitorLogo = ({ name }: { name: string }) => {
+  const colors: Record<string, string> = {
+    "Castmagic": "bg-purple-100 text-purple-700",
+    "Repurpose.io": "bg-blue-100 text-blue-700",
+    "Quso.ai": "bg-emerald-100 text-emerald-700",
+    "Predis.ai": "bg-orange-100 text-orange-700",
+    "Typical Social Tools": "bg-gray-100 text-gray-600",
+  };
+
+  return (
+    <span className={`inline-block rounded-md px-2 py-1 text-xs font-semibold ${colors[name] || "bg-gray-100 text-gray-600"}`}>
+      {name}
+    </span>
+  );
 };
 
 const ValueCell = ({ value }: { value: string }) => {
@@ -96,9 +113,9 @@ const ComparisonSection = () => {
                 {comparisonData.competitors.map((competitor) => (
                   <th
                     key={competitor.name}
-                    className="p-4 text-center text-sm font-medium text-muted-foreground"
+                    className="p-4 text-center"
                   >
-                    {competitor.name}
+                    <CompetitorLogo name={competitor.name} />
                   </th>
                 ))}
                 <th className="bg-primary/10 p-4 text-center">
