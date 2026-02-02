@@ -80,13 +80,35 @@ const FloatingIcon = ({
 
   const handleHover = () => {
     setIsHovered(true);
-    // Move away from cursor in a random direction
-    const angle = Math.random() * Math.PI * 2;
-    const distance = 80 + Math.random() * 40;
-    setPosition({
-      x: position.x + Math.cos(angle) * distance,
-      y: position.y + Math.sin(angle) * distance,
-    });
+    // Calculate angle from center to current position
+    const angleFromCenter = Math.atan2(position.y, position.x);
+    // Add some randomness but keep moving outward from center
+    const randomOffset = (Math.random() - 0.5) * (Math.PI / 3);
+    const finalAngle = angleFromCenter + randomOffset;
+    const distance = 60 + Math.random() * 30;
+    
+    // Calculate new position, ensuring minimum distance from center
+    let newX = position.x + Math.cos(finalAngle) * distance;
+    let newY = position.y + Math.sin(finalAngle) * distance;
+    
+    // Ensure minimum distance from center (avoid going behind the text block)
+    const minDistance = 100;
+    const maxDistance = 180;
+    const distFromCenter = Math.sqrt(newX * newX + newY * newY);
+    
+    if (distFromCenter < minDistance) {
+      // Push outward to minimum distance
+      const scale = minDistance / distFromCenter;
+      newX *= scale;
+      newY *= scale;
+    } else if (distFromCenter > maxDistance) {
+      // Keep within bounds
+      const scale = maxDistance / distFromCenter;
+      newX *= scale;
+      newY *= scale;
+    }
+    
+    setPosition({ x: newX, y: newY });
     setTimeout(() => setIsHovered(false), 500);
   };
 
