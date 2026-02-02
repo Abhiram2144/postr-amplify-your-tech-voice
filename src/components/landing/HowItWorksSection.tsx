@@ -1,5 +1,5 @@
 import { motion, useInView, AnimatePresence } from "framer-motion";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState } from "react";
 import { Upload, Search, Sparkles, Send, Check } from "lucide-react";
 
 const steps = [
@@ -7,25 +7,38 @@ const steps = [
     icon: Upload,
     title: "Upload or paste",
     description: "Drop a video or paste your text, script, or idea into Postr.",
-    details: "Supports video files, YouTube links, text documents, and raw ideas.",
+    preview: {
+      type: "input",
+      content: "My latest product launch video explaining our new AI features...",
+    },
   },
   {
     icon: Search,
     title: "Analyze",
     description: "Postr analyzes structure, clarity, and flow using AI.",
-    details: "Identifies key themes, evaluates narrative strength, and scores content.",
+    preview: {
+      type: "analysis",
+      metrics: ["Structure: Strong", "Clarity: 92%", "Hook: Detected"],
+    },
   },
   {
     icon: Sparkles,
     title: "Improve",
     description: "Content is restructured and enhanced automatically.",
-    details: "Adds psychological hooks, improves readability, and optimizes for engagement.",
+    preview: {
+      type: "improvement",
+      before: "We launched a new feature...",
+      after: "🚀 Just shipped: The feature you've been asking for...",
+    },
   },
   {
     icon: Send,
     title: "Generate",
     description: "Get platform-ready posts and scripts instantly.",
-    details: "Export to LinkedIn, X, Threads, Reddit, Instagram, YouTube, and TikTok.",
+    preview: {
+      type: "output",
+      platforms: ["LinkedIn", "X", "Threads"],
+    },
   },
 ];
 
@@ -33,35 +46,94 @@ const HowItWorksSection = () => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
   const [activeStep, setActiveStep] = useState(0);
-  const [isAutoPlaying, setIsAutoPlaying] = useState(false);
-
-  // Start auto-play animation when in view
-  useEffect(() => {
-    if (isInView && !isAutoPlaying) {
-      setIsAutoPlaying(true);
-      setActiveStep(0);
-    }
-  }, [isInView, isAutoPlaying]);
-
-  // Auto-advance through steps
-  useEffect(() => {
-    if (!isAutoPlaying) return;
-    
-    const timer = setInterval(() => {
-      setActiveStep((prev) => {
-        if (prev >= steps.length - 1) {
-          return prev; // Stay at last step
-        }
-        return prev + 1;
-      });
-    }, 2500);
-
-    return () => clearInterval(timer);
-  }, [isAutoPlaying]);
 
   const handleStepClick = (index: number) => {
     setActiveStep(index);
-    setIsAutoPlaying(false);
+  };
+
+  // Preview components for each step type
+  const renderPreview = (step: typeof steps[0]) => {
+    switch (step.preview.type) {
+      case "input":
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15, duration: 0.3, ease: "easeOut" }}
+            className="rounded-lg border border-border bg-secondary/50 p-4"
+          >
+            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+              <div className="h-2 w-2 rounded-full bg-primary/50" />
+              Input detected
+            </div>
+            <p className="text-sm text-foreground">{step.preview.content}</p>
+          </motion.div>
+        );
+      case "analysis":
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15, duration: 0.3, ease: "easeOut" }}
+            className="space-y-2"
+          >
+            {step.preview.metrics?.map((metric, i) => (
+              <motion.div
+                key={metric}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.2 + i * 0.1, duration: 0.3, ease: "easeOut" }}
+                className="flex items-center gap-3 rounded-lg border border-border bg-secondary/50 px-4 py-2"
+              >
+                <Check className="h-4 w-4 text-primary" />
+                <span className="text-sm text-foreground">{metric}</span>
+              </motion.div>
+            ))}
+          </motion.div>
+        );
+      case "improvement":
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15, duration: 0.3, ease: "easeOut" }}
+            className="space-y-3"
+          >
+            <div className="rounded-lg border border-border bg-secondary/30 p-3">
+              <div className="text-xs text-muted-foreground mb-1">Before</div>
+              <p className="text-sm text-muted-foreground line-through">{step.preview.before}</p>
+            </div>
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-3">
+              <div className="text-xs text-primary mb-1">After</div>
+              <p className="text-sm text-foreground">{step.preview.after}</p>
+            </div>
+          </motion.div>
+        );
+      case "output":
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15, duration: 0.3, ease: "easeOut" }}
+            className="flex gap-2"
+          >
+            {step.preview.platforms?.map((platform, i) => (
+              <motion.div
+                key={platform}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.2 + i * 0.08, duration: 0.3, ease: "easeOut" }}
+                className="flex-1 rounded-lg border border-border bg-secondary/50 p-3 text-center"
+              >
+                <div className="text-xs text-muted-foreground mb-1">Ready for</div>
+                <div className="text-sm font-medium text-foreground">{platform}</div>
+              </motion.div>
+            ))}
+          </motion.div>
+        );
+      default:
+        return null;
+    }
   };
 
   return (
@@ -70,14 +142,12 @@ const HowItWorksSection = () => {
       ref={ref}
       className="relative border-t border-border py-24 sm:py-32"
     >
-      {/* Background accent */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,hsl(199,89%,48%,0.03),transparent_70%)]" />
-
       <div className="container relative mx-auto px-4">
+        {/* Header */}
         <motion.div
-          initial={{ opacity: 0, y: 40 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.6 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
           className="text-center"
         >
           <span className="inline-block rounded-full border border-primary/30 bg-primary/10 px-4 py-1 text-sm font-medium text-primary">
@@ -89,23 +159,24 @@ const HowItWorksSection = () => {
           </h2>
         </motion.div>
 
-        <div className="mx-auto mt-16 max-w-5xl">
-          {/* Progress Bar */}
+        <div className="mx-auto mt-16 max-w-4xl">
+          {/* Stepper Timeline */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={isInView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.6, delay: 0.2 }}
+            transition={{ duration: 0.5, delay: 0.1, ease: "easeOut" }}
             className="relative mb-12"
           >
             {/* Background track */}
             <div className="absolute left-0 right-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-secondary" />
             
-            {/* Animated progress */}
+            {/* Animated progress line */}
             <motion.div
               className="absolute left-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-gradient-to-r from-primary to-accent"
-              initial={{ width: "0%" }}
-              animate={{ width: `${(activeStep / (steps.length - 1)) * 100}%` }}
-              transition={{ duration: 0.5, ease: "easeOut" }}
+              initial={{ scaleX: 0 }}
+              animate={{ scaleX: activeStep / (steps.length - 1) }}
+              transition={{ duration: 0.4, ease: "easeInOut" }}
+              style={{ transformOrigin: "left", width: "100%" }}
             />
 
             {/* Step indicators */}
@@ -113,52 +184,41 @@ const HowItWorksSection = () => {
               {steps.map((step, index) => {
                 const isActive = index === activeStep;
                 const isCompleted = index < activeStep;
+                const isUpcoming = index > activeStep;
 
                 return (
                   <motion.button
                     key={index}
                     onClick={() => handleStepClick(index)}
                     className="group relative flex flex-col items-center"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+                    animate={{
+                      scale: isActive ? 1.05 : 1,
+                      opacity: isCompleted || isActive ? 1 : 0.4,
+                    }}
+                    transition={{ duration: 0.3, ease: "easeOut" }}
                   >
                     {/* Step circle */}
-                    <motion.div
+                    <div
                       className={`relative z-10 flex h-14 w-14 items-center justify-center rounded-full border-2 transition-all duration-300 ${
                         isActive
-                          ? "border-primary bg-primary text-primary-foreground shadow-lg shadow-primary/30"
+                          ? "border-primary bg-primary text-primary-foreground shadow-lg"
                           : isCompleted
                           ? "border-primary bg-primary text-primary-foreground"
                           : "border-border bg-card text-muted-foreground hover:border-primary/50"
                       }`}
-                      animate={isActive ? { scale: [1, 1.1, 1] } : {}}
-                      transition={{ duration: 0.5, repeat: isActive ? Infinity : 0, repeatDelay: 1 }}
+                      style={isActive ? { boxShadow: "0 0 20px hsl(264, 100%, 65%, 0.4)" } : {}}
                     >
                       {isCompleted ? (
                         <Check className="h-6 w-6" />
                       ) : (
                         <step.icon className="h-6 w-6" />
                       )}
-                    </motion.div>
+                    </div>
 
-                    {/* Step number badge */}
-                    <motion.span
-                      className={`absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
-                        isActive || isCompleted
-                          ? "bg-accent text-accent-foreground"
-                          : "bg-muted text-muted-foreground"
-                      }`}
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ delay: 0.3 + index * 0.1 }}
-                    >
-                      {index + 1}
-                    </motion.span>
-
-                    {/* Step title (hidden on mobile) */}
+                    {/* Step title */}
                     <span
                       className={`mt-3 hidden text-sm font-medium transition-colors sm:block ${
-                        isActive ? "text-primary" : "text-muted-foreground"
+                        isActive ? "text-primary" : isUpcoming ? "text-muted-foreground/50" : "text-muted-foreground"
                       }`}
                     >
                       {step.title}
@@ -169,106 +229,67 @@ const HowItWorksSection = () => {
             </div>
           </motion.div>
 
-          {/* Active Step Details */}
+          {/* Content Card with horizontal slide */}
           <AnimatePresence mode="wait">
             <motion.div
               key={activeStep}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.4 }}
-              className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 to-card p-8"
+              initial={{ x: 40, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: -40, opacity: 0 }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
+              className="rounded-2xl border border-border bg-card p-8 shadow-sm"
             >
-              <div className="flex flex-col items-center gap-6 md:flex-row md:items-start">
-                {/* Large Icon */}
-                <motion.div
-                  className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl bg-primary/10"
-                  initial={{ scale: 0.8, rotate: -10 }}
-                  animate={{ scale: 1, rotate: 0 }}
-                  transition={{ type: "spring", stiffness: 200, damping: 15 }}
-                >
-                  {(() => {
-                    const Icon = steps[activeStep].icon;
-                    return <Icon className="h-12 w-12 text-primary" />;
-                  })()}
-                </motion.div>
-
-                {/* Content */}
-                <div className="flex-1 text-center md:text-left">
+              <div className="flex flex-col gap-6 md:flex-row md:items-start">
+                {/* Icon + Title group */}
+                <div className="flex items-start gap-4 md:w-1/3">
                   <motion.div
-                    className="mb-2 inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.1 }}
+                    initial={{ rotate: -15, opacity: 0 }}
+                    animate={{ rotate: 0, opacity: 1 }}
+                    transition={{ duration: 0.4, ease: "easeOut" }}
+                    className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10"
                   >
-                    Step {activeStep + 1} of {steps.length}
+                    {(() => {
+                      const Icon = steps[activeStep].icon;
+                      return <Icon className="h-7 w-7 text-primary" />;
+                    })()}
                   </motion.div>
-                  
-                  <motion.h3
-                    className="text-2xl font-bold text-foreground"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.15 }}
-                  >
-                    {steps[activeStep].title}
-                  </motion.h3>
-                  
-                  <motion.p
-                    className="mt-2 text-lg text-muted-foreground"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.2 }}
-                  >
-                    {steps[activeStep].description}
-                  </motion.p>
-                  
-                  <motion.p
-                    className="mt-4 rounded-lg bg-secondary/50 p-4 text-sm text-foreground"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.25 }}
-                  >
-                    {steps[activeStep].details}
-                  </motion.p>
+                  <div>
+                    <div className="text-xs font-medium text-muted-foreground mb-1">
+                      Step {activeStep + 1}
+                    </div>
+                    <h3 className="text-xl font-bold text-foreground">
+                      {steps[activeStep].title}
+                    </h3>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {steps[activeStep].description}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Preview area */}
+                <div className="md:w-2/3">
+                  {renderPreview(steps[activeStep])}
                 </div>
               </div>
 
-              {/* Mini progress dots */}
+              {/* Step navigation dots */}
               <div className="mt-6 flex justify-center gap-2">
                 {steps.map((_, index) => (
                   <button
                     key={index}
                     onClick={() => handleStepClick(index)}
-                    className={`h-2 rounded-full transition-all ${
+                    className={`h-2 rounded-full transition-all duration-300 ${
                       index === activeStep
                         ? "w-8 bg-primary"
                         : index < activeStep
                         ? "w-2 bg-primary/50"
-                        : "w-2 bg-muted"
+                        : "w-2 bg-muted hover:bg-muted-foreground/30"
                     }`}
                   />
                 ))}
               </div>
             </motion.div>
           </AnimatePresence>
-
-          {/* Auto-play indicator */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 1 }}
-            className="mt-4 flex justify-center"
-          >
-            <button
-              onClick={() => {
-                setIsAutoPlaying(!isAutoPlaying);
-                if (!isAutoPlaying) setActiveStep(0);
-              }}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {isAutoPlaying ? "Pause animation" : "Replay animation"}
-            </button>
-          </motion.div>
         </div>
       </div>
     </section>
