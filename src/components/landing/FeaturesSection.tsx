@@ -209,7 +209,7 @@ const FeaturesSection = () => {
                   <platform.icon />
                 </div>
                 <span className="font-medium text-foreground">{platform.name}</span>
-                <span className="text-xs text-muted-foreground">with psychological hooks</span>
+                
               </motion.div>)}
           </div>
         </motion.div>
