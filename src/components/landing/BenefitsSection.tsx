@@ -42,9 +42,6 @@ const BenefitsSection = () => {
           transition={{ duration: 0.6 }}
           className="text-center"
         >
-          <span className="inline-block rounded-full border border-accent/30 bg-accent/10 px-4 py-1 text-sm font-medium text-accent">
-            Why Postr
-          </span>
           <h2 className="mt-6 text-3xl font-bold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
             Intelligence that understands{" "}
             <span className="gradient-text">your thinking</span>

@@ -45,9 +45,6 @@ const UseCasesSection = () => {
           transition={{ duration: 0.6 }}
           className="text-center"
         >
-          <span className="inline-block rounded-full border border-primary/30 bg-primary/10 px-4 py-1 text-sm font-medium text-primary">
-            Use Cases
-          </span>
           <h2 className="mt-6 text-3xl font-bold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
             Built for <span className="gradient-text">tech creators</span> like you
           </h2>
