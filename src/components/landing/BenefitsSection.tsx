@@ -91,19 +91,19 @@ const Card3D = ({ benefit, index, isInView }: { benefit: typeof benefits[0]; ind
           scale: isHovered ? 1.02 : 1,
         }}
         transition={{ duration: 0.2 }}
-        className="relative h-full overflow-hidden rounded-2xl border border-border/50 bg-card/80 backdrop-blur-sm"
-        style={{ transformStyle: "preserve-3d" }}
+        className={`relative h-full overflow-hidden rounded-2xl border border-border/50 backdrop-blur-sm transition-colors duration-500 ease-out ${isHovered ? '' : 'bg-card/80'}`}
+        style={{ 
+          transformStyle: "preserve-3d",
+          background: isHovered 
+            ? `linear-gradient(135deg, ${benefit.gradient.includes('violet') ? 'hsl(270, 60%, 96%)' : benefit.gradient.includes('cyan') ? 'hsl(185, 60%, 96%)' : benefit.gradient.includes('emerald') ? 'hsl(160, 60%, 96%)' : 'hsl(35, 60%, 96%)'}, hsl(var(--card) / 0.8))`
+            : undefined
+        }}
       >
-        {/* Gradient background layer */}
-        <div 
-          className={`absolute inset-0 bg-gradient-to-br ${benefit.bgGradient} opacity-0 transition-opacity duration-500 group-hover:opacity-100`}
-        />
-        
         {/* Shine effect */}
         <motion.div
           className="absolute inset-0 opacity-0 group-hover:opacity-100"
           style={{
-            background: `linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.1) 45%, rgba(255, 255, 255, 0.2) 50%, rgba(255, 255, 255, 0.1) 55%, transparent 60%)`,
+            background: `linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.15) 45%, rgba(255, 255, 255, 0.25) 50%, rgba(255, 255, 255, 0.15) 55%, transparent 60%)`,
             transform: "translateX(-100%)",
           }}
           animate={isHovered ? { transform: "translateX(100%)" } : { transform: "translateX(-100%)" }}
