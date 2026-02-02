@@ -29,7 +29,7 @@ const plans = [
   },
   {
     name: "Creator",
-    price: "$9",
+    price: "$14",
     period: "/month",
     description: "For growing content creators",
     cta: "Start free trial",
