@@ -188,7 +188,7 @@ const FeaturesSection = () => {
               Short-Form Video Scripts
             </span>
             <h3 className="mt-4 text-xl font-bold text-foreground">
-              Scripts with psychological hooks that capture attention
+              Scripts with <span className="text-primary">psychological hooks</span> that capture attention
             </h3>
           </div>
           <div className="mt-8 grid gap-4 sm:grid-cols-3">
