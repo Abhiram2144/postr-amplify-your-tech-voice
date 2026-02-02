@@ -7,6 +7,8 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Check, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { getSafeErrorMessage } from "@/lib/errors";
+import { signupSchema } from "@/lib/validation";
 
 const GoogleIcon = () => (
   <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -54,19 +56,14 @@ const Signup = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!fullName || !email || !password) {
+    // Validate input using zod schema
+    const validation = signupSchema.safeParse({ fullName, email, password });
+    
+    if (!validation.success) {
+      const firstError = validation.error.errors[0];
       toast({
-        title: "Missing fields",
-        description: "Please fill in all fields",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (password.length < 6) {
-      toast({
-        title: "Password too short",
-        description: "Password must be at least 6 characters",
+        title: "Validation Error",
+        description: firstError.message,
         variant: "destructive",
       });
       return;
@@ -74,12 +71,16 @@ const Signup = () => {
 
     setIsLoading(true);
     try {
-      const { error } = await signUp(email, password, fullName);
+      const { error } = await signUp(
+        validation.data.email, 
+        validation.data.password, 
+        validation.data.fullName
+      );
 
       if (error) {
         toast({
           title: "Sign up failed",
-          description: error.message,
+          description: getSafeErrorMessage(error),
           variant: "destructive",
         });
         return;
@@ -89,10 +90,10 @@ const Signup = () => {
         title: "Account created!",
         description: "Please check your email to verify your account.",
       });
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error",
-        description: error.message || "An unexpected error occurred",
+        description: getSafeErrorMessage(error),
         variant: "destructive",
       });
     } finally {
@@ -107,14 +108,14 @@ const Signup = () => {
       if (error) {
         toast({
           title: "Google sign up failed",
-          description: error.message,
+          description: getSafeErrorMessage(error),
           variant: "destructive",
         });
       }
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error",
-        description: error.message || "An unexpected error occurred",
+        description: getSafeErrorMessage(error),
         variant: "destructive",
       });
     } finally {
