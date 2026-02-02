@@ -126,10 +126,7 @@ const HeroSection = () => {
         duration: 0.7,
         delay: 0.2,
         ease: "easeOut"
-      }} className="mt-6 max-w-2xl text-lg text-muted-foreground sm:text-xl">
-          Postr helps developers and tech professionals transform ideas, videos, and
-          scripts into high-quality posts and short-form video scripts with psychological hooks.
-        </motion.p>
+      }} className="mt-6 max-w-2xl text-lg text-muted-foreground sm:text-xl">From idea to post; optimized for every platform.</motion.p>
 
         {/* CTAs */}
         <motion.div initial={{
