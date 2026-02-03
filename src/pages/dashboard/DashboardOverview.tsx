@@ -1,4 +1,5 @@
-import { useOutletContext, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useOutletContext, useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,7 +12,9 @@ import {
   ArrowRight,
   Clock,
 } from "lucide-react";
+import { useSubscription } from "@/hooks/useSubscription";
 import type { UserProfile } from "@/components/dashboard/DashboardLayout";
+import CheckoutSuccessModal from "@/components/dashboard/CheckoutSuccessModal";
 
 interface DashboardContext {
   profile: UserProfile | null;
@@ -35,11 +38,32 @@ const itemVariants = {
 const DashboardOverview = () => {
   const { profile } = useOutletContext<DashboardContext>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { plan, checkSubscription } = useSubscription();
+  const [showCheckoutSuccess, setShowCheckoutSuccess] = useState(false);
 
-  const generationsUsed = 10 - (profile?.monthly_generation_limit || 10);
-  const generationsTotal = 10;
-  const videosUsed = 2 - (profile?.monthly_video_limit || 2);
-  const videosTotal = 2;
+  // Check for checkout success param
+  useEffect(() => {
+    if (searchParams.get("checkout") === "success") {
+      setShowCheckoutSuccess(true);
+      // Remove the query param
+      searchParams.delete("checkout");
+      setSearchParams(searchParams, { replace: true });
+      // Refresh subscription status
+      checkSubscription();
+    }
+  }, [searchParams, setSearchParams, checkSubscription]);
+
+  // Get limits based on plan
+  const planLimits = {
+    free: { generations: 10, videos: 2 },
+    creator: { generations: 100, videos: 20 },
+    pro: { generations: 999, videos: 999 },
+  };
+  const limits = planLimits[plan] || planLimits.free;
+  
+  const generationsTotal = limits.generations;
+  const videosTotal = limits.videos;
 
   // Placeholder recent projects (empty state for now)
   const recentProjects: Array<{ id: string; title: string; type: string; date: string }> = [];
@@ -52,13 +76,20 @@ const DashboardOverview = () => {
   const randomTip = tips[Math.floor(Math.random() * tips.length)];
 
   return (
-    <div className="p-6 lg:p-8 max-w-5xl mx-auto">
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="show"
-        className="space-y-8"
-      >
+    <>
+      {/* Checkout Success Modal */}
+      <CheckoutSuccessModal 
+        open={showCheckoutSuccess} 
+        onClose={() => setShowCheckoutSuccess(false)} 
+      />
+      
+      <div className="p-6 lg:p-8 max-w-5xl mx-auto">
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="show"
+          className="space-y-8"
+        >
         {/* Welcome Section */}
         <motion.div variants={itemVariants} className="space-y-2">
           <h1 className="text-3xl lg:text-4xl font-bold text-foreground">
@@ -268,8 +299,9 @@ const DashboardOverview = () => {
             </CardContent>
           </Card>
         </motion.div>
-      </motion.div>
-    </div>
+        </motion.div>
+      </div>
+    </>
   );
 };
 

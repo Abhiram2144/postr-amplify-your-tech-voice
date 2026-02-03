@@ -82,6 +82,12 @@ serve(async (req) => {
       subscriptionId = subscription.id;
       const productId = subscription.items.data[0].price.product as string;
       plan = PLAN_MAPPING[productId] || "free";
+      
+      // Get subscription start date safely (handle cases where it might not exist)
+      const startDate = subscription.start_date 
+        ? new Date(subscription.start_date * 1000).toISOString()
+        : new Date().toISOString();
+      
       logStep("Active subscription found", { subscriptionId, plan, productId, endDate: subscriptionEnd });
 
       // Update user record with subscription info (non-sensitive data only)
@@ -95,7 +101,7 @@ serve(async (req) => {
         .from("users")
         .update({
           plan,
-          plan_started_at: new Date(subscription.start_date * 1000).toISOString(),
+          plan_started_at: startDate,
           plan_expires_at: subscriptionEnd,
           ...limits
         })

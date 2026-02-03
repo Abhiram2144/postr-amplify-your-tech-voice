@@ -46,12 +46,12 @@ const platformLimitForPlan = (plan: string | null | undefined) => {
   return 3;
 };
 
-// Billing Tab Component
-const BillingTabContent = ({ profile }: { profile: UserProfile | null }) => {
-  const navigate = useNavigate();
-  const { plan, subscribed, subscriptionEnd, openCustomerPortal } = useSubscription();
+// My Plan Tab Component
+const MyPlanTabContent = ({ profile }: { profile: UserProfile | null }) => {
+  const { plan, subscribed, subscriptionEnd, openCustomerPortal, openCheckout, loading } = useSubscription();
   const { toast } = useToast();
   const [loadingPortal, setLoadingPortal] = useState(false);
+  const [loadingCheckout, setLoadingCheckout] = useState<string | null>(null);
 
   const handleManageSubscription = async () => {
     setLoadingPortal(true);
@@ -68,13 +68,48 @@ const BillingTabContent = ({ profile }: { profile: UserProfile | null }) => {
     }
   };
 
-  const planDetails = {
-    free: { name: "Free", features: "5 ideas, 2 videos, 3 platforms" },
-    creator: { name: "Creator", features: "100 ideas, 20 videos, all platforms" },
-    pro: { name: "Pro", features: "Unlimited ideas & videos, priority processing" },
+  const handleUpgrade = async (priceId: string, planName: string) => {
+    setLoadingCheckout(planName);
+    try {
+      await openCheckout(priceId);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: getSafeErrorMessage(error),
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingCheckout(null);
+    }
   };
 
-  const currentPlanDetails = planDetails[plan] || planDetails.free;
+  const plans = [
+    {
+      id: "free",
+      name: "Free",
+      price: "$0",
+      period: "/month",
+      features: ["5 ideas per month", "2 videos per month", "3 platforms"],
+      priceId: null,
+    },
+    {
+      id: "creator",
+      name: "Creator",
+      price: "$14",
+      period: "/month",
+      features: ["100 ideas per month", "20 videos per month", "All platforms"],
+      priceId: "price_1SwoC8H0ScE1y6GM38RcxUcw",
+      popular: true,
+    },
+    {
+      id: "pro",
+      name: "Pro",
+      price: "$29",
+      period: "/month",
+      features: ["Unlimited ideas", "Unlimited videos", "Priority processing"],
+      priceId: "price_1SwoCXH0ScE1y6GMgQlfMFgr",
+    },
+  ];
 
   return (
     <motion.div
@@ -82,68 +117,123 @@ const BillingTabContent = ({ profile }: { profile: UserProfile | null }) => {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6"
     >
+      {/* Current Plan Status */}
       <Card>
         <CardHeader>
           <CardTitle>Current Plan</CardTitle>
-          <CardDescription>Manage your subscription</CardDescription>
+          <CardDescription>
+            {subscribed && subscriptionEnd
+              ? `Renews on ${new Date(subscriptionEnd).toLocaleDateString()}`
+              : "You're currently on the free plan"}
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between p-4 rounded-xl bg-muted/50">
-            <div>
-              <p className="font-semibold text-foreground text-lg">
-                {currentPlanDetails.name} Plan
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {currentPlanDetails.features}
-              </p>
-              {subscribed && subscriptionEnd && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Renews on {new Date(subscriptionEnd).toLocaleDateString()}
-                </p>
-              )}
-            </div>
-            <div className="flex gap-2">
-              {subscribed && (
-                <Button
-                  variant="outline"
-                  onClick={handleManageSubscription}
-                  disabled={loadingPortal}
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-3">
+            {plans.map((planOption) => {
+              const isCurrentPlan = plan === planOption.id;
+              const canUpgrade = !isCurrentPlan && planOption.priceId;
+              const isDowngrade = 
+                (plan === "pro" && planOption.id !== "pro") ||
+                (plan === "creator" && planOption.id === "free");
+
+              return (
+                <div
+                  key={planOption.id}
+                  className={`relative rounded-xl border p-4 transition-all duration-200 ${
+                    isCurrentPlan
+                      ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                      : planOption.popular
+                      ? "border-primary/50 hover:border-primary"
+                      : "border-border hover:border-primary/30"
+                  }`}
                 >
-                  {loadingPortal ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <>
-                      Manage
-                      <ExternalLink className="h-4 w-4 ml-1" />
-                    </>
+                  {/* Current plan badge */}
+                  {isCurrentPlan && (
+                    <div className="absolute -top-2.5 left-4 px-2 py-0.5 bg-primary text-primary-foreground text-xs font-medium rounded-full">
+                      Your Plan
+                    </div>
                   )}
-                </Button>
-              )}
-              {plan !== "pro" && (
-                <Button variant="hero" onClick={() => navigate("/pricing")}>
-                  Upgrade
-                </Button>
-              )}
-            </div>
+                  
+                  {/* Popular badge */}
+                  {planOption.popular && !isCurrentPlan && (
+                    <div className="absolute -top-2.5 left-4 px-2 py-0.5 bg-accent text-accent-foreground text-xs font-medium rounded-full">
+                      Popular
+                    </div>
+                  )}
+
+                  <div className="mt-2">
+                    <h3 className="font-semibold text-foreground">{planOption.name}</h3>
+                    <div className="flex items-baseline gap-1 mt-1">
+                      <span className="text-2xl font-bold text-foreground">{planOption.price}</span>
+                      <span className="text-sm text-muted-foreground">{planOption.period}</span>
+                    </div>
+                  </div>
+
+                  <ul className="mt-4 space-y-2">
+                    {planOption.features.map((feature, idx) => (
+                      <li key={idx} className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Check className="h-4 w-4 text-primary shrink-0" />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+
+                  <div className="mt-4">
+                    {isCurrentPlan ? (
+                      subscribed ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={handleManageSubscription}
+                          disabled={loadingPortal}
+                        >
+                          {loadingPortal ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <>
+                              Manage
+                              <ExternalLink className="h-3 w-3 ml-1" />
+                            </>
+                          )}
+                        </Button>
+                      ) : (
+                        <Button variant="outline" size="sm" className="w-full" disabled>
+                          Current Plan
+                        </Button>
+                      )
+                    ) : canUpgrade && !isDowngrade ? (
+                      <Button
+                        variant={planOption.popular ? "hero" : "outline"}
+                        size="sm"
+                        className="w-full"
+                        onClick={() => handleUpgrade(planOption.priceId!, planOption.id)}
+                        disabled={loadingCheckout !== null}
+                      >
+                        {loadingCheckout === planOption.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          "Upgrade"
+                        )}
+                      </Button>
+                    ) : isDowngrade && subscribed ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={handleManageSubscription}
+                        disabled={loadingPortal}
+                      >
+                        Downgrade
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </CardContent>
       </Card>
-
-      {!subscribed && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Payment Method</CardTitle>
-            <CardDescription>Payment info is managed through Stripe</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-center p-8 border-2 border-dashed rounded-xl">
-              <p className="text-muted-foreground">
-                Upgrade to a paid plan to add a payment method
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </motion.div>
   );
 };
@@ -160,7 +250,7 @@ const SettingsPage = () => {
 
   useEffect(() => {
     const tab = searchParams.get("tab");
-    if (tab && ["profile", "platforms", "billing", "security"].includes(tab)) {
+    if (tab && ["profile", "platforms", "plan", "security"].includes(tab)) {
       setActiveTab(tab);
     }
   }, [searchParams]);
@@ -257,9 +347,9 @@ const SettingsPage = () => {
               <Globe className="h-4 w-4" />
               <span className="hidden sm:inline">Platforms</span>
             </TabsTrigger>
-            <TabsTrigger value="billing" className="flex-1 gap-2">
+            <TabsTrigger value="plan" className="flex-1 gap-2">
               <CreditCard className="h-4 w-4" />
-              <span className="hidden sm:inline">Billing</span>
+              <span className="hidden sm:inline">My Plan</span>
             </TabsTrigger>
             <TabsTrigger value="security" className="flex-1 gap-2">
               <Shield className="h-4 w-4" />
@@ -352,9 +442,9 @@ const SettingsPage = () => {
             </motion.div>
           </TabsContent>
 
-          {/* Billing Tab */}
-          <TabsContent value="billing" className="mt-6">
-            <BillingTabContent profile={profile} />
+          {/* My Plan Tab */}
+          <TabsContent value="plan" className="mt-6">
+            <MyPlanTabContent profile={profile} />
           </TabsContent>
 
           {/* Security Tab */}
