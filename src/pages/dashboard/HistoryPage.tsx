@@ -75,7 +75,7 @@ const HistoryPage = () => {
       >
         {/* Header */}
         <div>
-          <h1 className="text-2xl lg:text-3xl font-bold text-foreground">History</h1>
+          <h1 className="text-2xl lg:text-3xl font-bold text-foreground">Content Library</h1>
           <p className="text-muted-foreground mt-1">Your past generated content</p>
         </div>
 

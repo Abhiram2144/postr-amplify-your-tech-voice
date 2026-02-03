@@ -8,7 +8,7 @@ const comparisonData = {
     "Structured Content Scoring",
     "Narrative Improvement / Advice",
     "Platform-Specific Post Generation",
-    "Tech-Audience Optimization",
+    "Audience-First Optimization",
     "Built for Thought Leadership",
   ],
   competitors: [

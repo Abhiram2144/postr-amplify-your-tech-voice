@@ -102,7 +102,7 @@ const GeneratePage = () => {
       >
         {/* Header */}
         <div>
-          <h1 className="text-2xl lg:text-3xl font-bold text-foreground">Generate Content</h1>
+          <h1 className="text-2xl lg:text-3xl font-bold text-foreground">Create Content</h1>
           <p className="text-muted-foreground mt-1">Transform your ideas into platform-ready posts</p>
         </div>
 

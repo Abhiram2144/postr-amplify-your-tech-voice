@@ -4,33 +4,33 @@ import { Upload, Search, Sparkles, Send, Check, ChevronLeft, ChevronRight } from
 import { Button } from "@/components/ui/button";
 const steps = [{
   icon: Upload,
-  title: "Upload or paste",
-  description: "Drop a video or paste your text, script, or idea into Postr.",
+  title: "Start with your idea",
+  description: "Drop a video or paste your text, script, or raw idea into Postr.",
   preview: {
     type: "input",
-    content: "My latest product launch video explaining our new AI features..."
+    content: "My thoughts on building better habits and staying consistent..."
   }
 }, {
   icon: Search,
-  title: "Analyze",
-  description: "Postr analyzes structure, clarity, and flow using AI.",
+  title: "Understand structure",
+  description: "Postr analyzes structure, clarity, and engagement potential.",
   preview: {
     type: "analysis",
     metrics: ["Structure: Strong", "Clarity: 92%", "Hook: Detected"]
   }
 }, {
   icon: Sparkles,
-  title: "Improve",
-  description: "Content is restructured and enhanced automatically.",
+  title: "Improve flow",
+  description: "Content is restructured and enhanced for maximum impact.",
   preview: {
     type: "improvement",
-    before: "We launched a new feature...",
-    after: "🚀 Just shipped: The feature you've been asking for..."
+    before: "I've been thinking about productivity...",
+    after: "🎯 The productivity hack nobody talks about..."
   }
 }, {
   icon: Send,
-  title: "Generate",
-  description: "Get platform-ready posts and scripts instantly.",
+  title: "Generate content",
+  description: "Get platform-native posts and scripts instantly.",
   preview: {
     type: "output",
     platforms: ["LinkedIn", "X", "Threads"]
