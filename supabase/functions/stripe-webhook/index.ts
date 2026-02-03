@@ -30,6 +30,11 @@ serve(async (req) => {
     return new Response("Server configuration error", { status: 500 });
   }
 
+  if (!webhookSecret) {
+    logStep("ERROR: STRIPE_WEBHOOK_SECRET not set");
+    return new Response("Server configuration error", { status: 500 });
+  }
+
   const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
   
   const supabaseClient = createClient(
@@ -40,21 +45,15 @@ serve(async (req) => {
 
   try {
     const body = await req.text();
-    let event: Stripe.Event;
-
-    // Verify webhook signature if secret is configured
-    if (webhookSecret) {
-      const signature = req.headers.get("stripe-signature");
-      if (!signature) {
-        logStep("ERROR: No signature provided");
-        return new Response("No signature", { status: 400 });
-      }
-      event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-    } else {
-      // For development without webhook secret
-      event = JSON.parse(body);
-      logStep("WARNING: Running without webhook signature verification");
+    
+    // Always verify webhook signature - no fallback for unsigned requests
+    const signature = req.headers.get("stripe-signature");
+    if (!signature) {
+      logStep("ERROR: No signature provided");
+      return new Response("No signature", { status: 400 });
     }
+    
+    const event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
 
     logStep("Event received", { type: event.type, id: event.id });
 
