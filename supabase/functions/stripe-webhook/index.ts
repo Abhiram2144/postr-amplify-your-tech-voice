@@ -53,7 +53,14 @@ serve(async (req) => {
       return new Response("No signature", { status: 400 });
     }
     
-    const event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+    // Use constructEventAsync for Deno compatibility with SubtleCrypto
+    const event = await stripe.webhooks.constructEventAsync(
+      body,
+      signature,
+      webhookSecret,
+      undefined,
+      Stripe.createSubtleCryptoProvider()
+    );
 
     logStep("Event received", { type: event.type, id: event.id });
 
