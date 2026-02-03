@@ -2,6 +2,15 @@ import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { 
   Plus, 
   LogOut, 
@@ -9,11 +18,12 @@ import {
   FileText, 
   Video, 
   TrendingUp,
-  Settings,
-  User
+  Check
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { getSafeErrorMessage } from "@/lib/errors";
 
 interface UserProfile {
   full_name: string | null;
@@ -25,11 +35,32 @@ interface UserProfile {
   primary_goal: string | null;
 }
 
+const PLATFORM_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "linkedin", label: "LinkedIn" },
+  { value: "x", label: "X" },
+  { value: "threads", label: "Threads" },
+  { value: "reddit", label: "Reddit" },
+  { value: "instagram", label: "Instagram" },
+  { value: "youtube", label: "YouTube" },
+  { value: "tiktok", label: "TikTok" },
+];
+
+const platformLimitForPlan = (plan: string | null | undefined) => {
+  const normalized = (plan ?? "free").toLowerCase();
+  if (normalized.includes("pro")) return 7;
+  if (normalized.includes("creator")) return 5;
+  return 3;
+};
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user, signOut, loading } = useAuth();
+  const { toast } = useToast();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
+  const [platformDialogOpen, setPlatformDialogOpen] = useState(false);
+  const [platformsToAdd, setPlatformsToAdd] = useState<string[]>([]);
+  const [savingPlatforms, setSavingPlatforms] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -65,6 +96,78 @@ const Dashboard = () => {
       console.error("Error fetching profile:", error);
     } finally {
       setLoadingProfile(false);
+    }
+  };
+
+  const currentPlatforms = profile?.platforms ?? [];
+  const platformLimit = platformLimitForPlan(profile?.plan);
+  const remainingPlatforms = Math.max(0, platformLimit - currentPlatforms.length);
+
+  const togglePlatformToAdd = (platform: string) => {
+    if (currentPlatforms.includes(platform)) return;
+
+    if (platformsToAdd.includes(platform)) {
+      setPlatformsToAdd(platformsToAdd.filter((p) => p !== platform));
+      return;
+    }
+
+    if (platformsToAdd.length >= remainingPlatforms) {
+      toast({
+        title: "Platform limit reached",
+        description: `Your plan allows up to ${platformLimit} platforms.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setPlatformsToAdd([...platformsToAdd, platform]);
+  };
+
+  const savePlatforms = async () => {
+    if (!user) return;
+    if (platformsToAdd.length === 0) {
+      setPlatformDialogOpen(false);
+      return;
+    }
+
+    const nextPlatforms = Array.from(new Set([...currentPlatforms, ...platformsToAdd]));
+    if (nextPlatforms.length > platformLimit) {
+      toast({
+        title: "Platform limit reached",
+        description: `Your plan allows up to ${platformLimit} platforms.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSavingPlatforms(true);
+    try {
+      const { error } = await supabase
+        .from("users")
+        .update({
+          platforms: nextPlatforms,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", user.id);
+
+      if (error) throw error;
+
+      setProfile((prev) => (prev ? { ...prev, platforms: nextPlatforms } : prev));
+      setPlatformsToAdd([]);
+      setPlatformDialogOpen(false);
+
+      toast({
+        title: "Platforms updated",
+        description: "Your platform preferences have been saved.",
+      });
+    } catch (error) {
+      toast({
+        title: "Update failed",
+        description: getSafeErrorMessage(error),
+        variant: "destructive",
+      });
+    } finally {
+      setSavingPlatforms(false);
     }
   };
 
@@ -160,11 +263,89 @@ const Dashboard = () => {
           </div>
 
           {/* Selected Platforms */}
-          {profile?.platforms && profile.platforms.length > 0 && (
+          {currentPlatforms.length > 0 && (
             <div className="mb-8">
-              <h2 className="text-lg font-semibold mb-3">Your Platforms</h2>
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h2 className="text-lg font-semibold">Your Platforms</h2>
+                  <p className="text-sm text-muted-foreground">
+                    {currentPlatforms.length}/{platformLimit} selected
+                  </p>
+                </div>
+
+                <Dialog
+                  open={platformDialogOpen}
+                  onOpenChange={(open) => {
+                    setPlatformDialogOpen(open);
+                    if (!open) setPlatformsToAdd([]);
+                  }}
+                >
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={currentPlatforms.length >= platformLimit}
+                      className="gap-2"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add platforms
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Add platforms</DialogTitle>
+                      <DialogDescription>
+                        You can add up to {remainingPlatforms} more on your current plan.
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      {PLATFORM_OPTIONS.map((opt) => {
+                        const alreadySelected = currentPlatforms.includes(opt.value);
+                        const selectedNow = platformsToAdd.includes(opt.value);
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => togglePlatformToAdd(opt.value)}
+                            disabled={alreadySelected}
+                            className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm transition-colors ${
+                              alreadySelected
+                                ? "cursor-not-allowed bg-muted/40 text-muted-foreground"
+                                : selectedNow
+                                  ? "border-primary bg-primary/5"
+                                  : "hover:bg-secondary"
+                            }`}
+                          >
+                            <span className="font-medium">{opt.label}</span>
+                            {alreadySelected ? (
+                              <Check className="h-4 w-4" />
+                            ) : selectedNow ? (
+                              <Check className="h-4 w-4 text-primary" />
+                            ) : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => setPlatformDialogOpen(false)}
+                        disabled={savingPlatforms}
+                      >
+                        Cancel
+                      </Button>
+                      <Button variant="hero" onClick={savePlatforms} disabled={savingPlatforms}>
+                        {savingPlatforms ? "Saving..." : "Save"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
               <div className="flex flex-wrap gap-2">
-                {profile.platforms.map((platform) => (
+                {currentPlatforms.map((platform) => (
                   <span
                     key={platform}
                     className="px-3 py-1 bg-secondary rounded-full text-sm capitalize"
