@@ -1,19 +1,19 @@
 import Header from "@/components/landing/Header";
 import Footer from "@/components/landing/Footer";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Video, FileSearch, Sparkles, Globe } from "lucide-react";
+import { ArrowRight, Upload, Search, Sparkles, Globe } from "lucide-react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 
 const features = [
   {
-    icon: Video,
+    icon: Upload,
     title: "What Postr does",
     description:
-      "Postr transforms your raw ideas, videos, and scripts into polished, platform-ready social media content. It's not a scheduler—it's a content intelligence engine.",
+      "Postr transforms your raw ideas, videos, and scripts into polished, platform-ready content. It's not a scheduler—it's a content intelligence engine for creators.",
   },
   {
-    icon: FileSearch,
+    icon: Search,
     title: "How content analysis works",
     description:
       "Our system analyzes structure, clarity, hooks, and flow. It identifies what makes your content engaging and where it needs improvement before generating anything.",
@@ -28,8 +28,15 @@ const features = [
     icon: Globe,
     title: "Supported platforms",
     description:
-      "LinkedIn for professional insights, X for threads and quick takes, Threads for casual tech talk, and Reddit for in-depth discussions.",
+      "LinkedIn for professional insights, X for threads and quick takes, Threads for casual conversation, Reddit for in-depth discussions, and video scripts for Instagram, YouTube, and TikTok.",
   },
+];
+
+const workflowSteps = [
+  "Start with an idea, script, or video",
+  "Understand structure and clarity",
+  "Improve flow and engagement",
+  "Generate platform-native content",
 ];
 
 const Product = () => {
@@ -48,12 +55,34 @@ const Product = () => {
             </span>
             <h1 className="mt-6 text-4xl font-black tracking-tight sm:text-5xl">
               Content intelligence for{" "}
-              <span className="gradient-text">tech creators</span>
+              <span className="gradient-text">every creator</span>
             </h1>
             <p className="mt-6 text-lg text-muted-foreground">
               Understand what Postr does, how it works, and why it's different from
               generic AI writing tools.
             </p>
+          </motion.div>
+
+          {/* Workflow Steps */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="mx-auto mt-12 max-w-3xl"
+          >
+            <div className="flex flex-wrap justify-center gap-3">
+              {workflowSteps.map((step, index) => (
+                <div
+                  key={index}
+                  className="flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm"
+                >
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                    {index + 1}
+                  </span>
+                  <span className="text-muted-foreground">{step}</span>
+                </div>
+              ))}
+            </div>
           </motion.div>
 
           <div className="mx-auto mt-16 grid max-w-5xl gap-8 sm:grid-cols-2">

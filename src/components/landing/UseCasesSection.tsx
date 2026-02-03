@@ -1,31 +1,37 @@
 import { motion, useInView } from "framer-motion";
 import { useRef } from "react";
-import { Code, Lightbulb, GraduationCap, Briefcase } from "lucide-react";
+import { GraduationCap, Briefcase, Sparkles, PenTool, Video } from "lucide-react";
 
 const useCases = [
   {
-    icon: Code,
-    title: "Developers building in public",
-    description:
-      "Share your coding journey, technical decisions, and project updates with an engaged audience.",
-  },
-  {
     icon: GraduationCap,
-    title: "Students sharing technical learnings",
+    title: "Educators and teachers",
     description:
-      "Turn your study notes and project experiences into valuable content that builds your portfolio.",
-  },
-  {
-    icon: Lightbulb,
-    title: "Founders growing authority",
-    description:
-      "Establish thought leadership by sharing insights, challenges, and wins from building your company.",
+      "Turn lessons and explanations into engaging posts and short-form videos.",
   },
   {
     icon: Briefcase,
-    title: "Engineers improving visibility",
+    title: "Founders and professionals",
     description:
-      "Stand out in your field by consistently sharing your expertise and professional insights.",
+      "Share insights, stories, and experiences with clarity and authority.",
+  },
+  {
+    icon: Sparkles,
+    title: "Content creators and influencers",
+    description:
+      "Repurpose ideas into posts that fit each platform's culture.",
+  },
+  {
+    icon: PenTool,
+    title: "Writers and thinkers",
+    description:
+      "Transform raw thoughts into structured, engaging content.",
+  },
+  {
+    icon: Video,
+    title: "Video creators",
+    description:
+      "Convert videos into scripts and posts without losing meaning.",
   },
 ];
 
@@ -46,11 +52,11 @@ const UseCasesSection = () => {
           className="text-center"
         >
           <h2 className="mt-6 text-3xl font-bold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
-            Built for <span className="gradient-text">tech creators</span> like you
+            Built for <span className="gradient-text">every creator</span>
           </h2>
         </motion.div>
 
-        <div className="mx-auto mt-16 grid max-w-4xl gap-6 sm:grid-cols-2">
+        <div className="mx-auto mt-16 grid max-w-5xl gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {useCases.map((useCase, index) => (
             <motion.div
               key={index}

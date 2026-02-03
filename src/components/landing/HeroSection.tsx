@@ -111,8 +111,8 @@ const HeroSection = () => {
         delay: 0.1,
         ease: "easeOut"
       }} className="max-w-4xl text-4xl font-black leading-tight tracking-tight text-foreground sm:text-5xl md:text-6xl lg:text-7xl">
-          Turn your tech ideas into{" "}
-          <span className="gradient-text">content people actually read.</span>
+          Turn your ideas into{" "}
+          <span className="gradient-text">content people actually care about.</span>
         </motion.h1>
 
         {/* Subheadline */}
@@ -126,7 +126,7 @@ const HeroSection = () => {
         duration: 0.7,
         delay: 0.2,
         ease: "easeOut"
-      }} className="mt-6 max-w-2xl text-lg text-muted-foreground sm:text-xl">From idea to post; optimized for every platform.</motion.p>
+      }} className="mt-6 max-w-2xl text-lg text-muted-foreground sm:text-xl">Postr helps creators transform ideas, videos, and scripts into platform-ready content that performs.</motion.p>
 
         {/* CTAs */}
         <motion.div initial={{

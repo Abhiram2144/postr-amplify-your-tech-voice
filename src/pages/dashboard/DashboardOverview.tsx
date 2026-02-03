@@ -85,7 +85,7 @@ const DashboardOverview = () => {
                 </motion.div>
                 <div className="flex-1 text-center md:text-left">
                   <h2 className="text-2xl font-bold text-foreground mb-2">
-                    Create New Content
+                    Start Creating
                   </h2>
                   <p className="text-muted-foreground mb-4 max-w-md">
                     Transform your ideas into engaging posts for all your platforms in seconds.
@@ -97,7 +97,7 @@ const DashboardOverview = () => {
                     onClick={() => navigate("/dashboard/generate")}
                   >
                     <Plus className="h-5 w-5" />
-                    New Project
+                    New Idea
                     <ArrowRight className="h-4 w-4 ml-1" />
                   </Button>
                 </div>
@@ -217,7 +217,7 @@ const DashboardOverview = () => {
                   <Clock className="h-8 w-8 text-muted-foreground" />
                 </motion.div>
                 <p className="text-muted-foreground mb-4">
-                  You're one idea away from your first post.
+                  Every great piece of content starts with a simple idea.
                 </p>
                 <Button
                   variant="outline"

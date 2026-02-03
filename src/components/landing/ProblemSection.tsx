@@ -66,10 +66,10 @@ const floatingPlatforms = [
 });
 
 const painPoints = [
-  { icon: Clock, text: "Writing posts takes too much time" },
-  { icon: Frown, text: "Content feels boring or ignored" },
-  { icon: Layers, text: "Each platform requires different formats" },
-  { icon: Bot, text: "Generic AI tools create cringe content" },
+  { icon: Clock, text: "Posting consistently takes too much time" },
+  { icon: Frown, text: "Content ideas lose clarity when repurposed" },
+  { icon: Layers, text: "Each platform expects a different format" },
+  { icon: Bot, text: "Generic AI tools create content that feels flat" },
   { icon: Award, text: "Creators want credibility, not hype" },
 ];
 
@@ -88,8 +88,8 @@ const ProblemSection = () => {
             transition={{ duration: 0.6 }}
           >
             <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
-              Posting consistently shouldn't feel harder than{" "}
-              <span className="gradient-text">building software.</span>
+              Great ideas deserve{" "}
+              <span className="gradient-text">great content.</span>
             </h2>
 
             <div className="mt-10 space-y-4">
