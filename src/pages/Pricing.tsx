@@ -1,105 +1,139 @@
+import { useState } from "react";
 import Header from "@/components/landing/Header";
 import Footer from "@/components/landing/Footer";
 import { Button } from "@/components/ui/button";
-import { Check, ArrowRight } from "lucide-react";
+import { Check, ArrowRight, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { useSubscription } from "@/hooks/useSubscription";
 import { useToast } from "@/hooks/use-toast";
 import { getSafeErrorMessage } from "@/lib/errors";
-
-const plans = [
-  {
-    name: "Free",
-    price: "$0",
-    period: "forever",
-    description: "For creators exploring content generation",
-    cta: "Get started",
-    variant: "heroOutline" as const,
-    highlighted: false,
-    bestFor: "Exploring",
-    features: [
-      "5 ideas per month",
-      "1–2 video uploads",
-      "Text and video input",
-      "Basic content analysis",
-      "All platforms (limited exports)",
-      "Standard processing",
-    ],
-  },
-  {
-    name: "Creator",
-    price: "$14",
-    period: "/month",
-    description: "For creators posting consistently",
-    cta: "Start free trial",
-    variant: "hero" as const,
-    highlighted: true,
-    bestFor: "Growing",
-    features: [
-      "100 ideas per month",
-      "20 video uploads",
-      "Text and video input",
-      "Advanced content analysis",
-      "Unlimited platform exports",
-      "Fast processing",
-      "Full project history",
-    ],
-  },
-  {
-    name: "Pro",
-    price: "$29",
-    period: "/month",
-    description: "For creators scaling their reach",
-    cta: "Start free trial",
-    variant: "heroOutline" as const,
-    highlighted: false,
-    bestFor: "Scaling",
-    features: [
-      "Unlimited ideas",
-      "Unlimited video uploads",
-      "Text and video input",
-      "Deep content analysis",
-      "Unlimited platform exports",
-      "Priority processing",
-      "Full project history",
-      "Tone customization",
-    ],
-  },
-];
+import { STRIPE_PLANS, type BillingCycle } from "@/lib/stripe-config";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 const Pricing = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  const { plan: currentPlan, openCheckout } = useSubscription();
   const { toast } = useToast();
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
 
-  const handleCtaClick = async () => {
-    if (authLoading) return;
+  const plans = [
+    {
+      name: "Free",
+      key: "free" as const,
+      price: "$0",
+      period: "forever",
+      description: "For creators exploring content generation",
+      cta: "Get started",
+      variant: "heroOutline" as const,
+      highlighted: false,
+      bestFor: "Exploring",
+      features: [
+        "5 ideas per month",
+        "2 video uploads",
+        "Text and video input",
+        "Basic content analysis",
+        "3 platforms",
+        "Standard processing",
+      ],
+    },
+    {
+      name: "Creator",
+      key: "creator" as const,
+      price: billingCycle === "monthly" 
+        ? `$${STRIPE_PLANS.creator.monthly.price}` 
+        : `$${STRIPE_PLANS.creator.yearly.monthlyEquivalent.toFixed(0)}`,
+      period: billingCycle === "monthly" ? "/month" : "/month (billed yearly)",
+      yearlyTotal: billingCycle === "yearly" ? `$${STRIPE_PLANS.creator.yearly.price}/year` : null,
+      description: "For creators posting consistently",
+      cta: currentPlan === "creator" ? "Current plan" : "Start free trial",
+      variant: "hero" as const,
+      highlighted: true,
+      bestFor: "Growing",
+      priceId: billingCycle === "monthly" 
+        ? STRIPE_PLANS.creator.monthly.priceId 
+        : STRIPE_PLANS.creator.yearly.priceId,
+      features: [
+        "100 ideas per month",
+        "20 video uploads",
+        "Text and video input",
+        "Advanced content analysis",
+        "Unlimited platform exports",
+        "Fast processing",
+        "Full project history",
+      ],
+    },
+    {
+      name: "Pro",
+      key: "pro" as const,
+      price: billingCycle === "monthly" 
+        ? `$${STRIPE_PLANS.pro.monthly.price}` 
+        : `$${STRIPE_PLANS.pro.yearly.monthlyEquivalent.toFixed(0)}`,
+      period: billingCycle === "monthly" ? "/month" : "/month (billed yearly)",
+      yearlyTotal: billingCycle === "yearly" ? `$${STRIPE_PLANS.pro.yearly.price}/year` : null,
+      description: "For creators scaling their reach",
+      cta: currentPlan === "pro" ? "Current plan" : "Start free trial",
+      variant: "heroOutline" as const,
+      highlighted: false,
+      bestFor: "Scaling",
+      priceId: billingCycle === "monthly" 
+        ? STRIPE_PLANS.pro.monthly.priceId 
+        : STRIPE_PLANS.pro.yearly.priceId,
+      features: [
+        "Unlimited ideas",
+        "Unlimited video uploads",
+        "Text and video input",
+        "Deep content analysis",
+        "Unlimited platform exports",
+        "Priority processing",
+        "Full project history",
+        "Tone customization",
+      ],
+    },
+  ];
 
+  const handleCtaClick = async (plan: typeof plans[0]) => {
+    if (authLoading || loadingPlan) return;
+
+    // Free plan - just navigate
+    if (plan.key === "free") {
+      if (!user) {
+        navigate("/signup");
+      } else {
+        navigate("/dashboard");
+      }
+      return;
+    }
+
+    // Current plan - do nothing
+    if (currentPlan === plan.key) {
+      return;
+    }
+
+    // Paid plan - need to be logged in
     if (!user) {
       navigate("/signup");
       return;
     }
 
-    try {
-      const { data, error } = await supabase
-        .from("users")
-        .select("onboarding_completed")
-        .eq("id", user.id)
-        .single();
-
-      if (error) throw error;
-
-      navigate(data?.onboarding_completed ? "/dashboard" : "/onboarding");
-    } catch (error) {
-      toast({
-        title: "Couldn't continue",
-        description: getSafeErrorMessage(error),
-        variant: "destructive",
-      });
-      // Fallback: let them finish onboarding
-      navigate("/onboarding");
+    // Open Stripe checkout
+    if (plan.priceId) {
+      setLoadingPlan(plan.key);
+      try {
+        await openCheckout(plan.priceId);
+      } catch (error) {
+        toast({
+          title: "Checkout failed",
+          description: getSafeErrorMessage(error),
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingPlan(null);
+      }
     }
   };
 
@@ -122,7 +156,34 @@ const Pricing = () => {
             </p>
           </motion.div>
 
-          <div className="mx-auto mt-16 grid max-w-5xl gap-6 md:grid-cols-3">
+          {/* Billing cycle toggle */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="flex items-center justify-center gap-4 mt-8"
+          >
+            <Label 
+              htmlFor="billing-cycle" 
+              className={billingCycle === "monthly" ? "text-foreground" : "text-muted-foreground"}
+            >
+              Monthly
+            </Label>
+            <Switch
+              id="billing-cycle"
+              checked={billingCycle === "yearly"}
+              onCheckedChange={(checked) => setBillingCycle(checked ? "yearly" : "monthly")}
+            />
+            <Label 
+              htmlFor="billing-cycle" 
+              className={billingCycle === "yearly" ? "text-foreground" : "text-muted-foreground"}
+            >
+              Yearly
+              <span className="ml-2 text-xs text-primary font-medium">Save 20%</span>
+            </Label>
+          </motion.div>
+
+          <div className="mx-auto mt-12 grid max-w-5xl gap-6 md:grid-cols-3">
             {plans.map((plan, index) => (
               <motion.div
                 key={index}
@@ -143,11 +204,22 @@ const Pricing = () => {
                   </div>
                 )}
 
+                {currentPlan === plan.key && (
+                  <div className="absolute -top-3 right-4">
+                    <span className="rounded-full bg-accent px-3 py-1 text-xs font-bold text-accent-foreground">
+                      Your plan
+                    </span>
+                  </div>
+                )}
+
                 <h3 className="text-xl font-bold">{plan.name}</h3>
                 <div className="mt-4 flex items-baseline gap-1">
                   <span className="text-4xl font-black">{plan.price}</span>
                   <span className="text-muted-foreground">{plan.period}</span>
                 </div>
+                {plan.yearlyTotal && (
+                  <p className="text-sm text-muted-foreground mt-1">{plan.yearlyTotal}</p>
+                )}
                 <p className="mt-2 text-sm text-muted-foreground">
                   {plan.description}
                 </p>
@@ -168,12 +240,18 @@ const Pricing = () => {
                   variant={plan.variant}
                   size="lg"
                   className="mt-6 w-full"
-                  onClick={handleCtaClick}
-                  disabled={authLoading}
+                  onClick={() => handleCtaClick(plan)}
+                  disabled={authLoading || loadingPlan === plan.key || currentPlan === plan.key}
                 >
                   <span className="inline-flex items-center justify-center">
-                    {plan.cta}
-                    <ArrowRight className="ml-1 h-4 w-4" />
+                    {loadingPlan === plan.key ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        {plan.cta}
+                        {currentPlan !== plan.key && <ArrowRight className="ml-1 h-4 w-4" />}
+                      </>
+                    )}
                   </span>
                 </Button>
               </motion.div>
@@ -186,7 +264,7 @@ const Pricing = () => {
             transition={{ delay: 0.5 }}
             className="mt-8 text-center text-sm text-muted-foreground"
           >
-            All plans include a 14-day free trial. No credit card required.
+            All paid plans include a 14-day free trial. Cancel anytime.
           </motion.p>
         </div>
       </main>

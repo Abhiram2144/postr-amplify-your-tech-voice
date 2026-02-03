@@ -4,6 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
+import { SubscriptionProvider } from "@/hooks/useSubscription";
+import { RoleProvider } from "@/hooks/useRole";
 import Index from "./pages/Index";
 import Product from "./pages/Product";
 import UseCases from "./pages/UseCases";
@@ -23,40 +25,61 @@ import HistoryPage from "./pages/dashboard/HistoryPage";
 import UsagePage from "./pages/dashboard/UsagePage";
 import SettingsPage from "./pages/dashboard/SettingsPage";
 
+// Admin imports
+import AdminLayout from "./components/admin/AdminLayout";
+import AdminOverview from "./pages/admin/AdminOverview";
+import AdminUsers from "./pages/admin/AdminUsers";
+import AdminUsage from "./pages/admin/AdminUsage";
+import AdminJobs from "./pages/admin/AdminJobs";
+import AdminFlags from "./pages/admin/AdminFlags";
+
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/product" element={<Product />} />
-            <Route path="/use-cases" element={<UseCases />} />
-            <Route path="/pricing" element={<Pricing />} />
-            <Route path="/docs" element={<Docs />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route path="/onboarding" element={<Onboarding />} />
-            
-            {/* Dashboard Routes */}
-            <Route path="/dashboard" element={<DashboardLayout />}>
-              <Route index element={<DashboardOverview />} />
-              <Route path="generate" element={<GeneratePage />} />
-              <Route path="projects" element={<ProjectsPage />} />
-              <Route path="history" element={<HistoryPage />} />
-              <Route path="usage" element={<UsagePage />} />
-              <Route path="settings" element={<SettingsPage />} />
-            </Route>
-            
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
+      <SubscriptionProvider>
+        <RoleProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/product" element={<Product />} />
+                <Route path="/use-cases" element={<UseCases />} />
+                <Route path="/pricing" element={<Pricing />} />
+                <Route path="/docs" element={<Docs />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<Signup />} />
+                <Route path="/onboarding" element={<Onboarding />} />
+                
+                {/* Dashboard Routes */}
+                <Route path="/dashboard" element={<DashboardLayout />}>
+                  <Route index element={<DashboardOverview />} />
+                  <Route path="generate" element={<GeneratePage />} />
+                  <Route path="projects" element={<ProjectsPage />} />
+                  <Route path="history" element={<HistoryPage />} />
+                  <Route path="usage" element={<UsagePage />} />
+                  <Route path="settings" element={<SettingsPage />} />
+                </Route>
+
+                {/* Admin Routes */}
+                <Route path="/admin" element={<AdminLayout />}>
+                  <Route index element={<AdminOverview />} />
+                  <Route path="users" element={<AdminUsers />} />
+                  <Route path="usage" element={<AdminUsage />} />
+                  <Route path="jobs" element={<AdminJobs />} />
+                  <Route path="flags" element={<AdminFlags />} />
+                </Route>
+                
+                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </TooltipProvider>
+        </RoleProvider>
+      </SubscriptionProvider>
     </AuthProvider>
   </QueryClientProvider>
 );
