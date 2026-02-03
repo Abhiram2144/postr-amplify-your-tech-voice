@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 
@@ -18,7 +18,7 @@ export const RoleProvider = ({ children }: { children: ReactNode }) => {
   const [role, setRole] = useState<AppRole>("user");
   const [loading, setLoading] = useState(true);
 
-  const refreshRole = async () => {
+  const refreshRole = useCallback(async () => {
     if (!user) {
       setRole("user");
       setLoading(false);
@@ -26,16 +26,24 @@ export const RoleProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      // Use RPC to call the security definer function
-      const { data, error } = await supabase.rpc("get_user_role", {
-        _user_id: user.id,
-      });
+      // Query user_roles table directly since RLS allows users to read their own roles
+      // Using type assertion since user_roles may not be in generated types yet
+      const { data, error } = await (supabase
+        .from("user_roles" as any)
+        .select("role")
+        .eq("user_id", user.id)
+        .order("role")
+        .limit(10) as any);
 
       if (error) {
         console.error("Error fetching role:", error);
         setRole("user");
+      } else if (data && data.length > 0) {
+        // Check if any role is admin
+        const hasAdmin = data.some((r: { role: string }) => r.role === "admin");
+        setRole(hasAdmin ? "admin" : "user");
       } else {
-        setRole((data as AppRole) || "user");
+        setRole("user");
       }
     } catch (error) {
       console.error("Error fetching role:", error);
@@ -43,11 +51,11 @@ export const RoleProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     refreshRole();
-  }, [user]);
+  }, [refreshRole]);
 
   return (
     <RoleContext.Provider
