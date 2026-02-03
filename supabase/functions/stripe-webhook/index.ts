@@ -86,20 +86,48 @@ serve(async (req) => {
               .eq("email", customerEmail)
               .limit(1);
             
+            if (error) {
+              logStep("Error finding user by email", { error: error.message });
+            }
+            
             if (users && users.length > 0) {
-              await supabaseClient
+              const userId = users[0].id;
+              
+              // Get subscription start date safely
+              const startDate = subscription.start_date 
+                ? new Date(subscription.start_date * 1000).toISOString()
+                : new Date().toISOString();
+              
+              // Update non-sensitive plan data in users table
+              const { error: updateError } = await supabaseClient
                 .from("users")
                 .update({
                   plan,
-                  stripe_customer_id: session.customer as string,
-                  stripe_subscription_id: subscription.id,
-                  plan_started_at: new Date(subscription.start_date * 1000).toISOString(),
+                  plan_started_at: startDate,
                   plan_expires_at: new Date(subscription.current_period_end * 1000).toISOString(),
                   ...limits
                 })
-                .eq("id", users[0].id);
+                .eq("id", userId);
               
-              logStep("User updated after checkout", { userId: users[0].id, plan });
+              if (updateError) {
+                logStep("Error updating user plan", { error: updateError.message });
+              }
+              
+              // Store sensitive Stripe IDs in admin-only table
+              const { error: stripeDataError } = await supabaseClient
+                .from("user_stripe_data")
+                .upsert({
+                  user_id: userId,
+                  stripe_customer_id: session.customer as string,
+                  stripe_subscription_id: subscription.id,
+                  updated_at: new Date().toISOString()
+                }, { onConflict: "user_id" });
+              
+              if (stripeDataError) {
+                logStep("Error updating stripe data", { error: stripeDataError.message });
+              }
+              
+              logStep("User updated after checkout", { userId, plan });
             }
           }
         }
@@ -116,26 +144,56 @@ serve(async (req) => {
         
         logStep("Subscription update", { subscriptionId: subscription.id, status: subscription.status, plan });
         
-        // Find user by stripe_customer_id
-        const { data: users } = await supabaseClient
-          .from("users")
-          .select("id")
+        // Find user by stripe_customer_id in user_stripe_data table
+        const { data: stripeData, error: stripeError } = await supabaseClient
+          .from("user_stripe_data")
+          .select("user_id")
           .eq("stripe_customer_id", customerId)
-          .limit(1);
+          .maybeSingle();
         
-        if (users && users.length > 0) {
-          await supabaseClient
+        if (stripeError) {
+          logStep("Error finding user by stripe customer id", { error: stripeError.message });
+        }
+        
+        if (stripeData) {
+          const userId = stripeData.user_id;
+          
+          // Get subscription start date safely
+          const startDate = subscription.start_date 
+            ? new Date(subscription.start_date * 1000).toISOString()
+            : new Date().toISOString();
+          
+          // Update non-sensitive plan data in users table
+          const { error: updateError } = await supabaseClient
             .from("users")
             .update({
               plan,
-              stripe_subscription_id: subscription.id,
-              plan_started_at: new Date(subscription.start_date * 1000).toISOString(),
+              plan_started_at: startDate,
               plan_expires_at: new Date(subscription.current_period_end * 1000).toISOString(),
               ...limits
             })
-            .eq("id", users[0].id);
+            .eq("id", userId);
           
-          logStep("User subscription updated", { userId: users[0].id, plan });
+          if (updateError) {
+            logStep("Error updating user plan", { error: updateError.message });
+          }
+          
+          // Update subscription ID in stripe data table
+          const { error: stripeDataError } = await supabaseClient
+            .from("user_stripe_data")
+            .update({
+              stripe_subscription_id: subscription.id,
+              updated_at: new Date().toISOString()
+            })
+            .eq("user_id", userId);
+          
+          if (stripeDataError) {
+            logStep("Error updating stripe data", { error: stripeDataError.message });
+          }
+          
+          logStep("User subscription updated", { userId, plan });
+        } else {
+          logStep("No user found for stripe customer", { customerId });
         }
         break;
       }
@@ -146,24 +204,50 @@ serve(async (req) => {
         
         logStep("Subscription canceled", { subscriptionId: subscription.id });
         
-        const { data: users } = await supabaseClient
-          .from("users")
-          .select("id")
+        // Find user by stripe_customer_id in user_stripe_data table
+        const { data: stripeData, error: stripeError } = await supabaseClient
+          .from("user_stripe_data")
+          .select("user_id")
           .eq("stripe_customer_id", customerId)
-          .limit(1);
+          .maybeSingle();
         
-        if (users && users.length > 0) {
-          await supabaseClient
+        if (stripeError) {
+          logStep("Error finding user by stripe customer id", { error: stripeError.message });
+        }
+        
+        if (stripeData) {
+          const userId = stripeData.user_id;
+          
+          // Downgrade user to free plan
+          const { error: updateError } = await supabaseClient
             .from("users")
             .update({
               plan: "free",
-              stripe_subscription_id: null,
               plan_expires_at: null,
               ...PLAN_LIMITS["free"]
             })
-            .eq("id", users[0].id);
+            .eq("id", userId);
           
-          logStep("User downgraded to free", { userId: users[0].id });
+          if (updateError) {
+            logStep("Error downgrading user", { error: updateError.message });
+          }
+          
+          // Clear subscription ID in stripe data table
+          const { error: stripeDataError } = await supabaseClient
+            .from("user_stripe_data")
+            .update({
+              stripe_subscription_id: null,
+              updated_at: new Date().toISOString()
+            })
+            .eq("user_id", userId);
+          
+          if (stripeDataError) {
+            logStep("Error updating stripe data", { error: stripeDataError.message });
+          }
+          
+          logStep("User downgraded to free", { userId });
+        } else {
+          logStep("No user found for stripe customer", { customerId });
         }
         break;
       }
