@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { motion, useInView } from "framer-motion";
 import { useRef } from "react";
-import { Linkedin, Twitter, Github } from "lucide-react";
+import { User } from "lucide-react";
 
 const productLinks = [
   { label: "Features", href: "/product", isRoute: true },
@@ -20,12 +20,6 @@ const companyLinks = [
 const legalLinks = [
   { label: "Privacy", href: "#", isRoute: false },
   { label: "Terms", href: "#", isRoute: false },
-];
-
-const socialLinks = [
-  { icon: Twitter, href: "#", label: "Twitter" },
-  { icon: Linkedin, href: "#", label: "LinkedIn" },
-  { icon: Github, href: "#", label: "GitHub" },
 ];
 
 const Footer = () => {
@@ -84,23 +78,17 @@ const Footer = () => {
               and Reddit.
             </p>
 
-            {/* Social Links */}
-            <div className="mt-6 flex gap-4">
-              {socialLinks.map((social, index) => (
-                <motion.a
-                  key={social.label}
-                  href={social.href}
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={isInView ? { opacity: 1, scale: 1 } : {}}
-                  transition={{ delay: 0.3 + index * 0.1 }}
-                  whileHover={{ scale: 1.1, y: -2 }}
-                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary"
-                  aria-label={social.label}
-                >
-                  <social.icon className="h-5 w-5" />
-                </motion.a>
-              ))}
-            </div>
+            {/* About Creator Link */}
+            <motion.a
+              href="#"
+              initial={{ opacity: 0, y: 10 }}
+              animate={isInView ? { opacity: 1, y: 0 } : {}}
+              transition={{ delay: 0.3 }}
+              className="mt-6 inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-primary"
+            >
+              <User className="h-4 w-4" />
+              About me, creator of Postr
+            </motion.a>
           </motion.div>
 
           {/* Product Links */}

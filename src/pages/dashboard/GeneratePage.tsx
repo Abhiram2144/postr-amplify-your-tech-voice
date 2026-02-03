@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   FileText,
@@ -192,32 +192,22 @@ const GeneratePage = () => {
   // Script Mode Input
   const [scriptText, setScriptText] = useState("");
   
-  // Platform Selection
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(
-    profile?.platforms || ["linkedin", "twitter"]
-  );
+  // Platforms come from user profile (set during onboarding or in settings) - not selectable here
+  const userPlatforms = profile?.platforms || ["linkedin", "twitter"];
   
   // Results
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [outputs, setOutputs] = useState<PlatformOutput[]>([]);
 
-  const togglePlatform = (platformId: string) => {
-    setSelectedPlatforms(prev => 
-      prev.includes(platformId)
-        ? prev.filter(p => p !== platformId)
-        : [...prev, platformId]
-    );
-  };
-
   const canProceed = useCallback(() => {
     if (currentStep === 1) {
-      if (selectedPlatforms.length === 0) return false;
+      if (userPlatforms.length === 0) return false;
       if (creationMode === "brief_topic") return topic.trim().length >= 3;
       if (creationMode === "script") return scriptText.trim().length >= 50;
       if (creationMode === "video") return true; // Mock mode
     }
     return true;
-  }, [currentStep, creationMode, topic, scriptText, selectedPlatforms.length]);
+  }, [currentStep, creationMode, topic, scriptText, userPlatforms.length]);
 
   const handleCopy = async (platform: string, content: string) => {
     await navigator.clipboard.writeText(content);
@@ -256,7 +246,7 @@ const GeneratePage = () => {
           intent: creationMode === "brief_topic" ? intent : undefined,
           tone: creationMode === "brief_topic" ? tone : undefined,
           script_text: creationMode === "script" ? scriptText : undefined,
-          platforms: selectedPlatforms,
+          platforms: userPlatforms,
         },
         headers: {
           Authorization: `Bearer ${session?.access_token}`,
@@ -308,7 +298,7 @@ const GeneratePage = () => {
 
   const getFilteredOutputs = () => {
     return outputs.filter(o => 
-      selectedPlatforms.some(sp => 
+      userPlatforms.some(sp => 
         o.platform.toLowerCase().includes(sp.toLowerCase()) ||
         sp.toLowerCase().includes(o.platform.toLowerCase())
       )
@@ -549,35 +539,39 @@ const GeneratePage = () => {
                 </CardContent>
               </Card>
 
-              {/* Platform Selection */}
+              {/* Platform Display (from settings - not selectable) */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Select Platforms</CardTitle>
-                  <CardDescription>Choose which platforms to generate content for</CardDescription>
+                  <CardTitle className="text-lg">Output Platforms</CardTitle>
+                  <CardDescription>
+                    Content will be generated for your selected platforms. 
+                    <a href="/dashboard/settings?tab=platforms" className="text-primary hover:underline ml-1">
+                      Change in settings
+                    </a>
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {PLATFORM_CONFIG.map((platform) => (
-                      <label
-                        key={platform.id}
-                        className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                          selectedPlatforms.includes(platform.id)
-                            ? "border-primary bg-primary/5"
-                            : "border-muted hover:border-muted-foreground/30"
-                        }`}
-                      >
-                        <Checkbox
-                          checked={selectedPlatforms.includes(platform.id)}
-                          onCheckedChange={() => togglePlatform(platform.id)}
-                        />
-                        <span className="text-lg">{platform.icon}</span>
-                        <span className="text-sm font-medium">{platform.label}</span>
-                      </label>
-                    ))}
+                  <div className="flex flex-wrap gap-2">
+                    {userPlatforms.length > 0 ? (
+                      userPlatforms.map((platformId) => {
+                        const platform = PLATFORM_CONFIG.find(p => p.id === platformId);
+                        return (
+                          <Badge
+                            key={platformId}
+                            variant="secondary"
+                            className="px-3 py-1.5 text-sm"
+                          >
+                            <span className="mr-1.5">{platform?.icon || "📝"}</span>
+                            {platform?.label || platformId}
+                          </Badge>
+                        );
+                      })
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        No platforms selected. <a href="/dashboard/settings?tab=platforms" className="text-primary hover:underline">Select platforms</a>
+                      </p>
+                    )}
                   </div>
-                  {selectedPlatforms.length === 0 && (
-                    <p className="text-sm text-destructive mt-2">Please select at least one platform</p>
-                  )}
                 </CardContent>
               </Card>
 

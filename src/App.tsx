@@ -7,6 +7,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { SubscriptionProvider } from "@/hooks/useSubscription";
 import { RoleProvider } from "@/hooks/useRole";
 import { CreditsProvider } from "@/hooks/useCredits";
+import ScrollToTop from "@/components/ScrollToTop";
 import Index from "./pages/Index";
 import Product from "./pages/Product";
 import UseCases from "./pages/UseCases";
@@ -46,6 +47,7 @@ const App = () => (
             <Toaster />
             <Sonner />
             <BrowserRouter>
+              <ScrollToTop />
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/product" element={<Product />} />
