@@ -82,8 +82,8 @@ const DashboardSidebar = ({ profile, collapsed, onToggleCollapse }: DashboardSid
       className="fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border flex flex-col z-50"
     >
       {/* Logo & Brand */}
-      <div className="p-4 flex items-center justify-between border-b border-sidebar-border">
-        <Link to="/" className="flex items-center gap-2.5 overflow-hidden">
+      <div className={`p-4 flex items-center border-b border-sidebar-border ${collapsed ? "justify-center" : "justify-between"}`}>
+        <Link to="/" className={`flex items-center gap-2.5 ${collapsed ? "" : "overflow-hidden"}`}>
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary shadow-lg shadow-primary/25">
             <span className="text-lg font-black text-primary-foreground">P</span>
           </div>
@@ -102,15 +102,31 @@ const DashboardSidebar = ({ profile, collapsed, onToggleCollapse }: DashboardSid
           </AnimatePresence>
         </Link>
         
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onToggleCollapse}
-          className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
-        >
-          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-        </Button>
+        {!collapsed && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onToggleCollapse}
+            className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+        )}
       </div>
+      
+      {/* Collapse toggle for collapsed state */}
+      {collapsed && (
+        <div className="px-3 py-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onToggleCollapse}
+            className="w-full h-8 text-muted-foreground hover:text-foreground"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
 
       {/* Primary CTA */}
       <div className="p-3">
@@ -148,12 +164,12 @@ const DashboardSidebar = ({ profile, collapsed, onToggleCollapse }: DashboardSid
                   isActive
                     ? "bg-primary/10 text-primary"
                     : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
-                }`}
+                } ${collapsed ? "justify-center" : ""}`}
               >
                 {isActive && (
                   <motion.div
                     layoutId="activeIndicator"
-                    className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-full"
+                    className={`absolute top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-full ${collapsed ? "left-0" : "left-0"}`}
                     transition={{ type: "spring", stiffness: 500, damping: 35 }}
                   />
                 )}
