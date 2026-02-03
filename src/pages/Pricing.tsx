@@ -2,8 +2,12 @@ import Header from "@/components/landing/Header";
 import Footer from "@/components/landing/Footer";
 import { Button } from "@/components/ui/button";
 import { Check, ArrowRight } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { getSafeErrorMessage } from "@/lib/errors";
 
 const plans = [
   {
@@ -72,6 +76,39 @@ const plans = [
 ];
 
 const Pricing = () => {
+  const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+  const { toast } = useToast();
+
+  const handleCtaClick = async () => {
+    if (authLoading) return;
+
+    if (!user) {
+      navigate("/signup");
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("users")
+        .select("onboarding_completed")
+        .eq("id", user.id)
+        .single();
+
+      if (error) throw error;
+
+      navigate(data?.onboarding_completed ? "/dashboard" : "/onboarding");
+    } catch (error) {
+      toast({
+        title: "Couldn't continue",
+        description: getSafeErrorMessage(error),
+        variant: "destructive",
+      });
+      // Fallback: let them finish onboarding
+      navigate("/onboarding");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -137,12 +174,13 @@ const Pricing = () => {
                   variant={plan.variant}
                   size="lg"
                   className="mt-6 w-full"
-                  asChild
+                  onClick={handleCtaClick}
+                  disabled={authLoading}
                 >
-                  <Link to="/signup">
+                  <span className="inline-flex items-center justify-center">
                     {plan.cta}
                     <ArrowRight className="ml-1 h-4 w-4" />
-                  </Link>
+                  </span>
                 </Button>
               </motion.div>
             ))}

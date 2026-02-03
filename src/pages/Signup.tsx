@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { getSafeErrorMessage } from "@/lib/errors";
 import { signupSchema } from "@/lib/validation";
+import { supabase } from "@/integrations/supabase/client";
 
 const GoogleIcon = () => (
   <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -46,11 +47,38 @@ const Signup = () => {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
-    if (!authLoading && user) {
-      navigate("/onboarding");
-    }
+    if (authLoading || !user) return;
+
+    let cancelled = false;
+    const routeAuthedUser = async () => {
+      setIsRedirecting(true);
+      try {
+        const { data, error } = await supabase
+          .from("users")
+          .select("onboarding_completed")
+          .eq("id", user.id)
+          .single();
+
+        if (error) throw error;
+        if (cancelled) return;
+
+        navigate(data?.onboarding_completed ? "/dashboard" : "/onboarding", { replace: true });
+      } catch {
+        if (cancelled) return;
+        // Safe fallback: let them finish onboarding
+        navigate("/onboarding", { replace: true });
+      } finally {
+        if (!cancelled) setIsRedirecting(false);
+      }
+    };
+
+    routeAuthedUser();
+    return () => {
+      cancelled = true;
+    };
   }, [user, authLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -123,7 +151,7 @@ const Signup = () => {
     }
   };
 
-  if (authLoading) {
+  if (authLoading || isRedirecting) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
