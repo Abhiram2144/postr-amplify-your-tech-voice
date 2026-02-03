@@ -3,8 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "@/hooks/useAuth";
 
 const Header = () => {
+  const { user, loading: authLoading, signOut } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -22,6 +24,11 @@ const Header = () => {
     { label: "Pricing", href: "/pricing" },
     { label: "Docs", href: "/docs" },
   ];
+
+  const handleLogout = async () => {
+    await signOut();
+    setMobileMenuOpen(false);
+  };
 
   return (
     <motion.header
@@ -64,18 +71,37 @@ const Header = () => {
         </nav>
 
         <div className="hidden items-center gap-3 md:flex">
-          <Button variant="ghost" asChild className="text-muted-foreground hover:text-foreground">
-            <Link to="/login">Log in</Link>
-          </Button>
-          <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-            <Button
-              variant={scrolled ? "default" : "heroOutline"}
-              asChild
-              className={scrolled ? "shadow-md" : ""}
-            >
-              <Link to="/signup">Get started</Link>
-            </Button>
-          </motion.div>
+          {!authLoading && user ? (
+            <>
+              <Button variant="ghost" asChild className="text-muted-foreground hover:text-foreground">
+                <Link to="/dashboard">Dashboard</Link>
+              </Button>
+              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                <Button
+                  variant={scrolled ? "default" : "heroOutline"}
+                  onClick={handleLogout}
+                  className={scrolled ? "shadow-md" : ""}
+                >
+                  Logout
+                </Button>
+              </motion.div>
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" asChild className="text-muted-foreground hover:text-foreground">
+                <Link to="/login">Log in</Link>
+              </Button>
+              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                <Button
+                  variant={scrolled ? "default" : "heroOutline"}
+                  asChild
+                  className={scrolled ? "shadow-md" : ""}
+                >
+                  <Link to="/signup">Get started</Link>
+                </Button>
+              </motion.div>
+            </>
+          )}
         </div>
 
         {/* Mobile Menu Toggle */}
@@ -115,12 +141,31 @@ const Header = () => {
                 </motion.div>
               ))}
               <div className="mt-4 flex flex-col gap-3">
-                <Button variant="ghost" asChild className="w-full">
-                  <Link to="/login">Log in</Link>
-                </Button>
-                <Button variant="hero" asChild className="w-full">
-                  <Link to="/signup">Get started</Link>
-                </Button>
+                {!authLoading && user ? (
+                  <>
+                    <Button variant="ghost" asChild className="w-full">
+                      <Link to="/dashboard" onClick={() => setMobileMenuOpen(false)}>
+                        Dashboard
+                      </Link>
+                    </Button>
+                    <Button variant="hero" className="w-full" onClick={handleLogout}>
+                      Logout
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button variant="ghost" asChild className="w-full">
+                      <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
+                        Log in
+                      </Link>
+                    </Button>
+                    <Button variant="hero" asChild className="w-full">
+                      <Link to="/signup" onClick={() => setMobileMenuOpen(false)}>
+                        Get started
+                      </Link>
+                    </Button>
+                  </>
+                )}
               </div>
             </nav>
           </motion.div>

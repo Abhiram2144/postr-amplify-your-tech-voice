@@ -8,6 +8,7 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { getSafeErrorMessage } from "@/lib/errors";
+import { ToastAction } from "@/components/ui/toast";
 
 const GoogleIcon = () => (
   <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -32,12 +33,17 @@ const GoogleIcon = () => (
 
 const Login = () => {
   const navigate = useNavigate();
-  const { signIn, signInWithGoogle, user, loading: authLoading } = useAuth();
+  const { signIn, signInWithGoogle, resendConfirmationEmail, user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
+  const isEmailNotConfirmedError = (message: string) => {
+    const normalized = message.toLowerCase();
+    return normalized.includes("email not confirmed") || normalized.includes("not confirmed");
+  };
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -62,9 +68,42 @@ const Login = () => {
       const { error } = await signIn(email, password);
       
       if (error) {
+        const message = getSafeErrorMessage(error);
+
+        if (email && isEmailNotConfirmedError(message)) {
+          toast({
+            title: "Confirm your email",
+            description: "Your account needs email verification before you can sign in.",
+            action: (
+              <ToastAction
+                altText="Resend confirmation email"
+                onClick={async () => {
+                  const { error: resendError } = await resendConfirmationEmail(email);
+                  if (resendError) {
+                    toast({
+                      title: "Resend failed",
+                      description: getSafeErrorMessage(resendError),
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  toast({
+                    title: "Email sent",
+                    description: "Check your inbox (and spam/junk) for the confirmation email.",
+                  });
+                }}
+              >
+                Resend
+              </ToastAction>
+            ),
+            variant: "destructive",
+          });
+          return;
+        }
+
         toast({
           title: "Sign in failed",
-          description: getSafeErrorMessage(error),
+          description: message,
           variant: "destructive",
         });
         return;

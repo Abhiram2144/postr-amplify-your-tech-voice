@@ -1,1 +1,4 @@
 project_id = "udcttaicmvcpyoeixgrl"
+# supabase/config.toml
+[auth.email]
+enable_confirmations = true
