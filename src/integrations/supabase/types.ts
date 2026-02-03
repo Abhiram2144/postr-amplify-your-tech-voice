@@ -172,6 +172,7 @@ export type Database = {
           email: string
           experience_level: string | null
           full_name: string | null
+          generations_used_this_month: number
           id: string
           monthly_generation_limit: number | null
           monthly_video_limit: number | null
@@ -184,6 +185,8 @@ export type Database = {
           role: string | null
           status: string | null
           updated_at: string | null
+          usage_reset_month: number
+          usage_reset_year: number
         }
         Insert: {
           auth_provider?: string | null
@@ -192,6 +195,7 @@ export type Database = {
           email: string
           experience_level?: string | null
           full_name?: string | null
+          generations_used_this_month?: number
           id: string
           monthly_generation_limit?: number | null
           monthly_video_limit?: number | null
@@ -204,6 +208,8 @@ export type Database = {
           role?: string | null
           status?: string | null
           updated_at?: string | null
+          usage_reset_month?: number
+          usage_reset_year?: number
         }
         Update: {
           auth_provider?: string | null
@@ -212,6 +218,7 @@ export type Database = {
           email?: string
           experience_level?: string | null
           full_name?: string | null
+          generations_used_this_month?: number
           id?: string
           monthly_generation_limit?: number | null
           monthly_video_limit?: number | null
@@ -224,6 +231,8 @@ export type Database = {
           role?: string | null
           status?: string | null
           updated_at?: string | null
+          usage_reset_month?: number
+          usage_reset_year?: number
         }
         Relationships: []
       }

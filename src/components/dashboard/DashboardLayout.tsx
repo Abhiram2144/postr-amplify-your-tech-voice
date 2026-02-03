@@ -11,6 +11,7 @@ export interface UserProfile {
   plan: string | null;
   monthly_generation_limit: number | null;
   monthly_video_limit: number | null;
+  generations_used_this_month: number | null;
   platforms: string[] | null;
   primary_goal: string | null;
   avatar_url: string | null;
@@ -40,7 +41,7 @@ const DashboardLayout = () => {
     try {
       const { data, error } = await supabase
         .from("users")
-        .select("full_name, email, plan, monthly_generation_limit, monthly_video_limit, platforms, primary_goal, onboarding_completed, avatar_url")
+        .select("full_name, email, plan, monthly_generation_limit, monthly_video_limit, generations_used_this_month, platforms, primary_goal, onboarding_completed, avatar_url")
         .eq("id", user.id)
         .single();
 
