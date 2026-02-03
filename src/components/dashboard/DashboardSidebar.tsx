@@ -24,8 +24,10 @@ import {
   User,
   CreditCard,
   ChevronDown,
+  Shield,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useRole } from "@/hooks/useRole";
 import type { UserProfile } from "./DashboardLayout";
 
 interface DashboardSidebarProps {
@@ -50,6 +52,7 @@ const DashboardSidebar = ({ profile, collapsed, onToggleCollapse }: DashboardSid
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut } = useAuth();
+  const { isAdmin } = useRole();
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const handleSignOut = async () => {
@@ -267,6 +270,15 @@ const DashboardSidebar = ({ profile, collapsed, onToggleCollapse }: DashboardSid
               <CreditCard className="h-4 w-4 mr-2" />
               Billing
             </DropdownMenuItem>
+            {isAdmin && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate("/admin")}>
+                  <Shield className="h-4 w-4 mr-2" />
+                  Admin Dashboard
+                </DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">
               <LogOut className="h-4 w-4 mr-2" />

@@ -14,8 +14,11 @@ import {
   Check,
   Plus,
   X,
+  ExternalLink,
+  Loader2,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useSubscription } from "@/hooks/useSubscription";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { getSafeErrorMessage } from "@/lib/errors";
@@ -41,6 +44,108 @@ const platformLimitForPlan = (plan: string | null | undefined) => {
   if (normalized.includes("pro")) return 7;
   if (normalized.includes("creator")) return 5;
   return 3;
+};
+
+// Billing Tab Component
+const BillingTabContent = ({ profile }: { profile: UserProfile | null }) => {
+  const navigate = useNavigate();
+  const { plan, subscribed, subscriptionEnd, openCustomerPortal } = useSubscription();
+  const { toast } = useToast();
+  const [loadingPortal, setLoadingPortal] = useState(false);
+
+  const handleManageSubscription = async () => {
+    setLoadingPortal(true);
+    try {
+      await openCustomerPortal();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: getSafeErrorMessage(error),
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingPortal(false);
+    }
+  };
+
+  const planDetails = {
+    free: { name: "Free", features: "5 ideas, 2 videos, 3 platforms" },
+    creator: { name: "Creator", features: "100 ideas, 20 videos, all platforms" },
+    pro: { name: "Pro", features: "Unlimited ideas & videos, priority processing" },
+  };
+
+  const currentPlanDetails = planDetails[plan] || planDetails.free;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-6"
+    >
+      <Card>
+        <CardHeader>
+          <CardTitle>Current Plan</CardTitle>
+          <CardDescription>Manage your subscription</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between p-4 rounded-xl bg-muted/50">
+            <div>
+              <p className="font-semibold text-foreground text-lg">
+                {currentPlanDetails.name} Plan
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {currentPlanDetails.features}
+              </p>
+              {subscribed && subscriptionEnd && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Renews on {new Date(subscriptionEnd).toLocaleDateString()}
+                </p>
+              )}
+            </div>
+            <div className="flex gap-2">
+              {subscribed && (
+                <Button
+                  variant="outline"
+                  onClick={handleManageSubscription}
+                  disabled={loadingPortal}
+                >
+                  {loadingPortal ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      Manage
+                      <ExternalLink className="h-4 w-4 ml-1" />
+                    </>
+                  )}
+                </Button>
+              )}
+              {plan !== "pro" && (
+                <Button variant="hero" onClick={() => navigate("/pricing")}>
+                  Upgrade
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {!subscribed && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Payment Method</CardTitle>
+            <CardDescription>Payment info is managed through Stripe</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-center p-8 border-2 border-dashed rounded-xl">
+              <p className="text-muted-foreground">
+                Upgrade to a paid plan to add a payment method
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </motion.div>
+  );
 };
 
 const SettingsPage = () => {
@@ -249,51 +354,7 @@ const SettingsPage = () => {
 
           {/* Billing Tab */}
           <TabsContent value="billing" className="mt-6">
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="space-y-6"
-            >
-              <Card>
-                <CardHeader>
-                  <CardTitle>Current Plan</CardTitle>
-                  <CardDescription>Manage your subscription</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-muted/50">
-                    <div>
-                      <p className="font-semibold text-foreground capitalize text-lg">
-                        {profile?.plan || "Free"} Plan
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {(profile?.plan || "free").toLowerCase().includes("pro")
-                          ? "100 generations, 20 videos, 7 platforms"
-                          : (profile?.plan || "free").toLowerCase().includes("creator")
-                            ? "50 generations, 10 videos, 5 platforms"
-                            : "10 generations, 2 videos, 3 platforms"}
-                      </p>
-                    </div>
-                    {!(profile?.plan || "free").toLowerCase().includes("pro") && (
-                      <Button variant="hero" onClick={() => navigate("/pricing")}>
-                        Upgrade
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Payment Method</CardTitle>
-                  <CardDescription>Add or update your payment information</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-center p-8 border-2 border-dashed rounded-xl">
-                    <p className="text-muted-foreground">No payment method on file</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
+            <BillingTabContent profile={profile} />
           </TabsContent>
 
           {/* Security Tab */}
