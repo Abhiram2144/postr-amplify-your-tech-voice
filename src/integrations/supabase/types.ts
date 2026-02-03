@@ -137,6 +137,33 @@ export type Database = {
         }
         Relationships: []
       }
+      user_stripe_data: {
+        Row: {
+          created_at: string | null
+          id: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       users: {
         Row: {
           auth_provider: string | null
@@ -156,8 +183,6 @@ export type Database = {
           primary_goal: string | null
           role: string | null
           status: string | null
-          stripe_customer_id: string | null
-          stripe_subscription_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -178,8 +203,6 @@ export type Database = {
           primary_goal?: string | null
           role?: string | null
           status?: string | null
-          stripe_customer_id?: string | null
-          stripe_subscription_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -200,8 +223,6 @@ export type Database = {
           primary_goal?: string | null
           role?: string | null
           status?: string | null
-          stripe_customer_id?: string | null
-          stripe_subscription_id?: string | null
           updated_at?: string | null
         }
         Relationships: []

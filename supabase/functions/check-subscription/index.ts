@@ -84,7 +84,7 @@ serve(async (req) => {
       plan = PLAN_MAPPING[productId] || "free";
       logStep("Active subscription found", { subscriptionId, plan, productId, endDate: subscriptionEnd });
 
-      // Update user record with subscription info
+      // Update user record with subscription info (non-sensitive data only)
       const limits = plan === "pro" 
         ? { monthly_generation_limit: 999, monthly_video_limit: 999 }
         : plan === "creator"
@@ -95,15 +95,23 @@ serve(async (req) => {
         .from("users")
         .update({
           plan,
-          stripe_customer_id: customerId,
-          stripe_subscription_id: subscriptionId,
           plan_started_at: new Date(subscription.start_date * 1000).toISOString(),
           plan_expires_at: subscriptionEnd,
           ...limits
         })
         .eq("id", user.id);
+
+      // Store sensitive Stripe data in separate admin-only table
+      await supabaseClient
+        .from("user_stripe_data")
+        .upsert({
+          user_id: user.id,
+          stripe_customer_id: customerId,
+          stripe_subscription_id: subscriptionId,
+          updated_at: new Date().toISOString()
+        }, { onConflict: "user_id" });
       
-      logStep("Updated user record", { plan, limits });
+      logStep("Updated user record and stripe data", { plan, limits });
     } else {
       logStep("No active subscription found");
     }
