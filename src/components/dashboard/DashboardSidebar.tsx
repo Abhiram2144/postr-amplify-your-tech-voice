@@ -35,10 +35,10 @@ interface DashboardSidebarProps {
 }
 
 const navItems = [
-  { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
-  { name: "Generate", path: "/dashboard/generate", icon: Sparkles },
+  { name: "Home", path: "/dashboard", icon: LayoutDashboard },
+  { name: "Create", path: "/dashboard/generate", icon: Sparkles },
   { name: "Projects", path: "/dashboard/projects", icon: FolderOpen },
-  { name: "History", path: "/dashboard/history", icon: Clock },
+  { name: "Content Library", path: "/dashboard/history", icon: Clock },
 ];
 
 const secondaryNavItems = [
@@ -125,7 +125,7 @@ const DashboardSidebar = ({ profile, collapsed, onToggleCollapse }: DashboardSid
                 exit={{ opacity: 0, width: 0 }}
                 transition={{ duration: 0.2 }}
               >
-                New Project
+                New Idea
               </motion.span>
             )}
           </AnimatePresence>

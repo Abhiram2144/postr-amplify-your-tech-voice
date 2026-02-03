@@ -17,12 +17,12 @@ const faqs = [
   {
     question: "Which platforms can Postr generate content for?",
     answer:
-      "Postr generates platform-specific content for LinkedIn, X (Twitter), Threads, and Reddit. Each output is formatted and optimized for that platform's unique culture and engagement patterns.",
+      "Postr generates platform-specific content for LinkedIn, X (Twitter), Threads, and Reddit. It also creates video scripts optimized for Instagram Reels, YouTube Shorts, and TikTok.",
   },
   {
     question: "How is Postr different from ChatGPT or other AI writers?",
     answer:
-      "Postr is built specifically for tech content creators. It analyzes your content structure first, provides improvement advice, and then generates platform-native outputs. Generic AI tools just generate—Postr thinks first.",
+      "Postr is built specifically for content creators. It analyzes your content structure first, provides improvement advice, and then generates platform-native outputs. Generic AI tools just generate—Postr thinks first.",
   },
   {
     question: "Can I customize the tone and style of outputs?",
@@ -38,6 +38,30 @@ const faqs = [
     question: "Is my content stored or used for training?",
     answer:
       "Your content is processed securely and not used to train our models. We respect your intellectual property and maintain strict privacy standards.",
+  },
+  {
+    question: "Who is Postr for?",
+    answer:
+      "Postr is for any creator who wants to turn ideas into high-performing content—educators, founders, content creators, writers, coaches, and anyone sharing their knowledge with an audience.",
+  },
+];
+
+const gettingStarted = [
+  {
+    title: "Start with an idea",
+    description: "Paste text, upload a video, or record your thoughts. Postr works with whatever you have.",
+  },
+  {
+    title: "Review the analysis",
+    description: "See how your content scores on structure, clarity, and engagement potential.",
+  },
+  {
+    title: "Apply improvements",
+    description: "Use our suggestions to strengthen your message, or let Postr enhance it automatically.",
+  },
+  {
+    title: "Export to platforms",
+    description: "Get tailored outputs for LinkedIn, X, Threads, Reddit, and video platforms.",
   },
 ];
 
@@ -63,10 +87,41 @@ const Docs = () => {
             </p>
           </motion.div>
 
+          {/* Getting Started */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
+            transition={{ delay: 0.15 }}
+            className="mx-auto mt-16 max-w-3xl"
+          >
+            <h2 className="text-2xl font-bold">Getting Started</h2>
+            <p className="mt-2 text-muted-foreground">Turn your ideas into content in four simple steps.</p>
+            
+            <div className="mt-8 grid gap-4 sm:grid-cols-2">
+              {gettingStarted.map((step, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 + index * 0.1 }}
+                  className="rounded-xl border border-border bg-card p-5"
+                >
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                      {index + 1}
+                    </span>
+                    <h3 className="font-semibold text-foreground">{step.title}</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{step.description}</p>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
             className="mx-auto mt-16 max-w-3xl"
           >
             <h2 className="text-2xl font-bold">Frequently Asked Questions</h2>

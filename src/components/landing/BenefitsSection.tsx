@@ -13,9 +13,9 @@ const benefits = [
   },
   {
     icon: Code2,
-    title: "Built for tech audiences",
+    title: "Built for clarity and engagement",
     description:
-      "Clear explanations. Logical flow. No fluff. Content that resonates with developers and engineers.",
+      "Clear explanations. Logical flow. No fluff. Content that resonates with your audience.",
     gradient: "from-cyan-500 to-blue-600",
     bgGradient: "from-cyan-500/10 to-blue-600/10",
   },

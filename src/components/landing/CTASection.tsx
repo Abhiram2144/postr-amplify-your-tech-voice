@@ -181,7 +181,7 @@ const CTASection = () => {
               transition={{ duration: 0.5, delay: 0.3 }}
               className="mt-6 text-lg text-primary-foreground/80"
             >
-              Join thousands of tech creators who save hours every week with Postr.
+              Join thousands of creators who save hours every week with Postr.
             </motion.p>
 
             <motion.div
