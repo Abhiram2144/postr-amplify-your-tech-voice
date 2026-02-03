@@ -1,67 +1,81 @@
 import Header from "@/components/landing/Header";
 import Footer from "@/components/landing/Footer";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Code, Rocket, GraduationCap, Briefcase, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowRight, GraduationCap, Briefcase, Sparkles, PenTool, Video, ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 
 const useCases = [
   {
-    icon: Code,
-    title: "Developers",
-    subtitle: "Building in public",
-    description:
-      "Share your coding journey, explain technical concepts, and build in public. Postr helps you articulate complex ideas in ways that resonate with other developers.",
-    examples: [
-      "Side project updates",
-      "Technical deep dives",
-      "Code review insights",
-      "Learning in public",
-    ],
-    color: "from-violet-500 to-purple-600",
-  },
-  {
-    icon: Rocket,
-    title: "Founders",
-    subtitle: "Growing authority",
-    description:
-      "Build authority while building your startup. Share your journey, lessons learned, and technical decisions without spending hours on content creation.",
-    examples: [
-      "Startup journey posts",
-      "Technical decision logs",
-      "Product updates",
-      "Founder insights",
-    ],
-    color: "from-orange-500 to-red-500",
-  },
-  {
     icon: GraduationCap,
-    title: "Students",
-    subtitle: "Sharing learnings",
+    title: "Educators",
+    subtitle: "Turning lessons into content",
     description:
-      "Document your learning journey and build a professional presence before graduation. Turn your coursework and projects into shareable content.",
+      "Transform your lessons, explanations, and educational content into engaging posts and short-form videos that reach students beyond the classroom.",
     examples: [
-      "Learning summaries",
-      "Project showcases",
-      "Interview prep content",
-      "Career building posts",
+      "Lesson summaries",
+      "Educational explainers",
+      "Course promotions",
+      "Teaching insights",
     ],
     color: "from-emerald-500 to-teal-500",
   },
   {
     icon: Briefcase,
-    title: "Professionals",
-    subtitle: "Improving visibility",
+    title: "Founders",
+    subtitle: "Building authority",
     description:
-      "Stand out in your career by sharing your expertise. Postr helps engineers and tech professionals build visibility without the content creation overhead.",
+      "Share your journey, lessons learned, and industry insights without spending hours on content creation. Build authority while building your business.",
     examples: [
-      "Industry insights",
-      "Career advice",
-      "Technical tutorials",
-      "Professional updates",
+      "Founder journey posts",
+      "Business insights",
+      "Product updates",
+      "Industry commentary",
+    ],
+    color: "from-orange-500 to-red-500",
+  },
+  {
+    icon: Sparkles,
+    title: "Creators",
+    subtitle: "Repurposing ideas",
+    description:
+      "Turn your ideas into posts that fit each platform's culture. Repurpose content across LinkedIn, X, Threads, Instagram, TikTok, and more.",
+    examples: [
+      "Cross-platform posts",
+      "Trending content",
+      "Audience engagement",
+      "Brand building",
+    ],
+    color: "from-violet-500 to-purple-600",
+  },
+  {
+    icon: PenTool,
+    title: "Writers",
+    subtitle: "Sharing thoughts",
+    description:
+      "Transform raw thoughts and long-form ideas into structured, engaging content. Turn articles into threads, essays into posts.",
+    examples: [
+      "Article summaries",
+      "Thread breakdowns",
+      "Opinion pieces",
+      "Newsletter teasers",
     ],
     color: "from-blue-500 to-cyan-500",
+  },
+  {
+    icon: Video,
+    title: "Video Creators",
+    subtitle: "Expanding reach",
+    description:
+      "Convert your videos into scripts, posts, and written content without losing meaning. Maximize the reach of every piece of video content.",
+    examples: [
+      "Video-to-post conversion",
+      "Script generation",
+      "Behind-the-scenes",
+      "Episode highlights",
+    ],
+    color: "from-pink-500 to-rose-500",
   },
 ];
 
@@ -123,12 +137,12 @@ const UseCases = () => {
             className="mx-auto max-w-3xl text-center"
           >
             <h1 className="text-3xl font-black tracking-tight sm:text-4xl lg:text-5xl">
-              Built for people who{" "}
-              <span className="gradient-text">ship and share</span>
+              Built for{" "}
+              <span className="gradient-text">every creator</span>
             </h1>
             <p className="mt-4 text-base text-muted-foreground sm:text-lg">
-              See how different tech professionals use Postr to grow their presence
-              and share their expertise.
+              See how creators use Postr to turn ideas into content
+              and grow their presence.
             </p>
           </motion.div>
 
