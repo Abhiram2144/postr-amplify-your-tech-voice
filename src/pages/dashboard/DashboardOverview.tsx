@@ -1,0 +1,276 @@
+import { useOutletContext, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Plus,
+  Sparkles,
+  FileText,
+  Video,
+  Lightbulb,
+  ArrowRight,
+  Clock,
+} from "lucide-react";
+import type { UserProfile } from "@/components/dashboard/DashboardLayout";
+
+interface DashboardContext {
+  profile: UserProfile | null;
+}
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.4, 0, 0.2, 1] as const } },
+};
+
+const DashboardOverview = () => {
+  const { profile } = useOutletContext<DashboardContext>();
+  const navigate = useNavigate();
+
+  const generationsUsed = 10 - (profile?.monthly_generation_limit || 10);
+  const generationsTotal = 10;
+  const videosUsed = 2 - (profile?.monthly_video_limit || 2);
+  const videosTotal = 2;
+
+  // Placeholder recent projects (empty state for now)
+  const recentProjects: Array<{ id: string; title: string; type: string; date: string }> = [];
+
+  const tips = [
+    "Tip: Paste a LinkedIn post to instantly adapt it for X and Threads.",
+    "Try uploading a short video clip to generate platform-ready captions.",
+    "Your best posts often come from raw, unpolished ideas. Just start!",
+  ];
+  const randomTip = tips[Math.floor(Math.random() * tips.length)];
+
+  return (
+    <div className="p-6 lg:p-8 max-w-5xl mx-auto">
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+        className="space-y-8"
+      >
+        {/* Welcome Section */}
+        <motion.div variants={itemVariants} className="space-y-2">
+          <h1 className="text-3xl lg:text-4xl font-bold text-foreground">
+            Welcome back{profile?.full_name ? `, ${profile.full_name.split(" ")[0]}` : ""}!
+          </h1>
+          <p className="text-lg text-muted-foreground">
+            Ready to turn an idea into content?
+          </p>
+        </motion.div>
+
+        {/* Primary CTA Card */}
+        <motion.div variants={itemVariants}>
+          <Card className="bg-gradient-to-br from-primary/5 via-background to-accent/5 border-primary/20 overflow-hidden relative">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_hsl(264,100%,65%,0.1),transparent_50%)]" />
+            <CardContent className="p-8 relative">
+              <div className="flex flex-col md:flex-row items-center gap-6">
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.3, duration: 0.5, ease: "easeOut" }}
+                  className="h-20 w-20 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0"
+                >
+                  <Sparkles className="h-10 w-10 text-primary" />
+                </motion.div>
+                <div className="flex-1 text-center md:text-left">
+                  <h2 className="text-2xl font-bold text-foreground mb-2">
+                    Create New Content
+                  </h2>
+                  <p className="text-muted-foreground mb-4 max-w-md">
+                    Transform your ideas into engaging posts for all your platforms in seconds.
+                  </p>
+                  <Button
+                    variant="hero"
+                    size="lg"
+                    className="gap-2"
+                    onClick={() => navigate("/dashboard/generate")}
+                  >
+                    <Plus className="h-5 w-5" />
+                    New Project
+                    <ArrowRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Stats Row */}
+        <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Card className="group hover:border-primary/30 transition-colors duration-300">
+            <CardContent className="p-5 flex items-center gap-4">
+              <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center group-hover:scale-105 transition-transform duration-300">
+                <FileText className="h-6 w-6 text-primary" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-bold text-foreground">
+                    {profile?.monthly_generation_limit || 10}
+                  </span>
+                  <span className="text-sm text-muted-foreground">/ {generationsTotal}</span>
+                </div>
+                <p className="text-sm text-muted-foreground">Generations left</p>
+              </div>
+              <div className="w-16 h-16">
+                <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+                  <circle
+                    cx="18"
+                    cy="18"
+                    r="15"
+                    fill="none"
+                    stroke="hsl(var(--muted))"
+                    strokeWidth="3"
+                  />
+                  <motion.circle
+                    cx="18"
+                    cy="18"
+                    r="15"
+                    fill="none"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeDasharray={94.2}
+                    initial={{ strokeDashoffset: 94.2 }}
+                    animate={{ strokeDashoffset: 94.2 * (1 - (profile?.monthly_generation_limit || 10) / generationsTotal) }}
+                    transition={{ duration: 1, ease: "easeOut", delay: 0.5 }}
+                  />
+                </svg>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="group hover:border-accent/30 transition-colors duration-300">
+            <CardContent className="p-5 flex items-center gap-4">
+              <div className="h-12 w-12 rounded-xl bg-accent/10 flex items-center justify-center group-hover:scale-105 transition-transform duration-300">
+                <Video className="h-6 w-6 text-accent" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-bold text-foreground">
+                    {profile?.monthly_video_limit || 2}
+                  </span>
+                  <span className="text-sm text-muted-foreground">/ {videosTotal}</span>
+                </div>
+                <p className="text-sm text-muted-foreground">Videos left</p>
+              </div>
+              <div className="w-16 h-16">
+                <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+                  <circle
+                    cx="18"
+                    cy="18"
+                    r="15"
+                    fill="none"
+                    stroke="hsl(var(--muted))"
+                    strokeWidth="3"
+                  />
+                  <motion.circle
+                    cx="18"
+                    cy="18"
+                    r="15"
+                    fill="none"
+                    stroke="hsl(var(--accent))"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeDasharray={94.2}
+                    initial={{ strokeDashoffset: 94.2 }}
+                    animate={{ strokeDashoffset: 94.2 * (1 - (profile?.monthly_video_limit || 2) / videosTotal) }}
+                    transition={{ duration: 1, ease: "easeOut", delay: 0.6 }}
+                  />
+                </svg>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Recent Projects */}
+        <motion.div variants={itemVariants}>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-foreground">Recent Projects</h3>
+            {recentProjects.length > 0 && (
+              <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard/projects")}>
+                View all
+                <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            )}
+          </div>
+
+          {recentProjects.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="p-8 flex flex-col items-center text-center">
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.4, duration: 0.4 }}
+                  className="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center mb-4"
+                >
+                  <Clock className="h-8 w-8 text-muted-foreground" />
+                </motion.div>
+                <p className="text-muted-foreground mb-4">
+                  You're one idea away from your first post.
+                </p>
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => navigate("/dashboard/generate")}
+                >
+                  <Plus className="h-4 w-4" />
+                  Create your first project
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-3">
+              {recentProjects.map((project) => (
+                <Card
+                  key={project.id}
+                  className="cursor-pointer hover:border-primary/30 transition-colors duration-200"
+                  onClick={() => navigate(`/dashboard/generate?project=${project.id}`)}
+                >
+                  <CardContent className="p-4 flex items-center gap-4">
+                    <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
+                      {project.type === "video" ? (
+                        <Video className="h-5 w-5 text-muted-foreground" />
+                      ) : (
+                        <FileText className="h-5 w-5 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-foreground">{project.title}</p>
+                      <p className="text-sm text-muted-foreground">{project.date}</p>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </motion.div>
+
+        {/* Helpful Tip */}
+        <motion.div variants={itemVariants}>
+          <Card className="bg-muted/50 border-0">
+            <CardContent className="p-4 flex items-start gap-3">
+              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                <Lightbulb className="h-4 w-4 text-primary" />
+              </div>
+              <p className="text-sm text-muted-foreground">{randomTip}</p>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </motion.div>
+    </div>
+  );
+};
+
+export default DashboardOverview;
