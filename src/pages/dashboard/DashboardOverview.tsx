@@ -13,6 +13,7 @@ import {
   Clock,
 } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
+import { STRIPE_PLANS, PlanType } from "@/lib/stripe-config";
 import type { UserProfile } from "@/components/dashboard/DashboardLayout";
 import CheckoutSuccessModal from "@/components/dashboard/CheckoutSuccessModal";
 
@@ -54,16 +55,43 @@ const DashboardOverview = () => {
     }
   }, [searchParams, setSearchParams, checkSubscription]);
 
-  // Get limits based on plan
-  const planLimits = {
-    free: { generations: 10, videos: 2 },
-    creator: { generations: 100, videos: 20 },
-    pro: { generations: 999, videos: 999 },
+  const normalizePlan = (value?: string | null): PlanType => {
+    const normalized = (value ?? "").toLowerCase();
+    if (normalized.includes("pro")) return "pro";
+    if (normalized.includes("creator")) return "creator";
+    return "free";
   };
-  const limits = planLimits[plan] || planLimits.free;
-  
-  const generationsTotal = limits.generations;
-  const videosTotal = limits.videos;
+
+  const subscriptionPlan = normalizePlan(plan);
+  const profilePlan = normalizePlan(profile?.plan);
+  const effectivePlan = subscriptionPlan !== "free" ? subscriptionPlan : profilePlan;
+
+  const planConfig = STRIPE_PLANS[effectivePlan];
+  const generationsTotal = planConfig.limits.ideasPerMonth;
+  const videosTotal = planConfig.limits.videosPerMonth;
+
+  // Cap remaining values to not exceed plan limits
+  const generationsRemaining = 
+    typeof generationsTotal === "number"
+      ? Math.min(profile?.monthly_generation_limit ?? generationsTotal, generationsTotal)
+      : profile?.monthly_generation_limit ?? null;
+  const videosRemaining = 
+    typeof videosTotal === "number"
+      ? Math.min(profile?.monthly_video_limit ?? videosTotal, videosTotal)
+      : profile?.monthly_video_limit ?? null;
+
+  const generationsPercent =
+    typeof generationsTotal === "number"
+      ? Math.min(100, Math.max(0, ((generationsRemaining ?? generationsTotal) / generationsTotal) * 100))
+      : 100;
+  const videosPercent =
+    typeof videosTotal === "number"
+      ? Math.min(100, Math.max(0, ((videosRemaining ?? videosTotal) / videosTotal) * 100))
+      : 100;
+
+  const formatLimit = (value: number | "unlimited") => (value === "unlimited" ? "Unlimited" : value);
+  const generationsRemainingLabel = generationsTotal === "unlimited" ? "Unlimited" : generationsRemaining ?? generationsTotal;
+  const videosRemainingLabel = videosTotal === "unlimited" ? "Unlimited" : videosRemaining ?? videosTotal;
 
   // Placeholder recent projects (empty state for now)
   const recentProjects: Array<{ id: string; title: string; type: string; date: string }> = [];
@@ -147,36 +175,29 @@ const DashboardOverview = () => {
               <div className="flex-1">
                 <div className="flex items-baseline gap-2">
                   <span className="text-2xl font-bold text-foreground">
-                    {profile?.monthly_generation_limit || 10}
+                    {generationsRemainingLabel}
                   </span>
-                  <span className="text-sm text-muted-foreground">/ {generationsTotal}</span>
+                  <span className="text-sm text-muted-foreground">/ {formatLimit(generationsTotal)}</span>
                 </div>
                 <p className="text-sm text-muted-foreground">Generations left</p>
               </div>
-              <div className="w-16 h-16">
-                <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-                  <circle
-                    cx="18"
-                    cy="18"
-                    r="15"
-                    fill="none"
-                    stroke="hsl(var(--muted))"
-                    strokeWidth="3"
-                  />
-                  <motion.circle
-                    cx="18"
-                    cy="18"
-                    r="15"
-                    fill="none"
-                    stroke="hsl(var(--primary))"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    strokeDasharray={94.2}
-                    initial={{ strokeDashoffset: 94.2 }}
-                    animate={{ strokeDashoffset: 94.2 * (1 - (profile?.monthly_generation_limit || 10) / generationsTotal) }}
-                    transition={{ duration: 1, ease: "easeOut", delay: 0.5 }}
-                  />
-                </svg>
+              <div className="relative w-16 h-16">
+                <div
+                  className="absolute inset-0 rounded-full"
+                  style={{
+                    background: `conic-gradient(hsl(var(--primary)) ${generationsPercent}%, hsl(var(--muted)) 0)`
+                  }}
+                />
+                <div className="absolute inset-[6px] rounded-full bg-background shadow-inner" />
+                <div
+                  className="absolute inset-0 rounded-full blur-[6px] opacity-40"
+                  style={{
+                    background: `conic-gradient(hsl(var(--primary)) ${generationsPercent}%, transparent 0)`
+                  }}
+                />
+                <div className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold text-muted-foreground">
+                  {generationsTotal === "unlimited" ? "∞" : `${Math.round(generationsPercent)}%`}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -189,36 +210,29 @@ const DashboardOverview = () => {
               <div className="flex-1">
                 <div className="flex items-baseline gap-2">
                   <span className="text-2xl font-bold text-foreground">
-                    {profile?.monthly_video_limit || 2}
+                    {videosRemainingLabel}
                   </span>
-                  <span className="text-sm text-muted-foreground">/ {videosTotal}</span>
+                  <span className="text-sm text-muted-foreground">/ {formatLimit(videosTotal)}</span>
                 </div>
                 <p className="text-sm text-muted-foreground">Videos left</p>
               </div>
-              <div className="w-16 h-16">
-                <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-                  <circle
-                    cx="18"
-                    cy="18"
-                    r="15"
-                    fill="none"
-                    stroke="hsl(var(--muted))"
-                    strokeWidth="3"
-                  />
-                  <motion.circle
-                    cx="18"
-                    cy="18"
-                    r="15"
-                    fill="none"
-                    stroke="hsl(var(--accent))"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    strokeDasharray={94.2}
-                    initial={{ strokeDashoffset: 94.2 }}
-                    animate={{ strokeDashoffset: 94.2 * (1 - (profile?.monthly_video_limit || 2) / videosTotal) }}
-                    transition={{ duration: 1, ease: "easeOut", delay: 0.6 }}
-                  />
-                </svg>
+              <div className="relative w-16 h-16">
+                <div
+                  className="absolute inset-0 rounded-full"
+                  style={{
+                    background: `conic-gradient(hsl(var(--accent)) ${videosPercent}%, hsl(var(--muted)) 0)`
+                  }}
+                />
+                <div className="absolute inset-[6px] rounded-full bg-background shadow-inner" />
+                <div
+                  className="absolute inset-0 rounded-full blur-[6px] opacity-40"
+                  style={{
+                    background: `conic-gradient(hsl(var(--accent)) ${videosPercent}%, transparent 0)`
+                  }}
+                />
+                <div className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold text-muted-foreground">
+                  {videosTotal === "unlimited" ? "∞" : `${Math.round(videosPercent)}%`}
+                </div>
               </div>
             </CardContent>
           </Card>

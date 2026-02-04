@@ -22,6 +22,7 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { getSafeErrorMessage } from "@/lib/errors";
+import { STRIPE_PLANS, PlanType } from "@/lib/stripe-config";
 import type { UserProfile } from "@/components/dashboard/DashboardLayout";
 
 interface DashboardContext {
@@ -39,19 +40,28 @@ const PLATFORM_OPTIONS = [
   { value: "tiktok", label: "TikTok" },
 ];
 
-const platformLimitForPlan = (plan: string | null | undefined) => {
-  const normalized = (plan ?? "free").toLowerCase();
-  if (normalized.includes("pro")) return 7;
-  if (normalized.includes("creator")) return 5;
+const normalizePlan = (value?: string | null): PlanType => {
+  const normalized = (value ?? "").toLowerCase();
+  if (normalized.includes("pro")) return "pro";
+  if (normalized.includes("creator")) return "creator";
+  return "free";
+};
+
+const platformLimitForPlan = (effectivePlan: PlanType) => {
+  if (effectivePlan === "pro") return 7;
+  if (effectivePlan === "creator") return 5;
   return 3;
 };
 
 // My Plan Tab Component
 const MyPlanTabContent = ({ profile }: { profile: UserProfile | null }) => {
-  const { plan, subscribed, subscriptionEnd, openCustomerPortal, openCheckout, loading } = useSubscription();
+  const { plan: subscriptionPlan, subscribed, subscriptionEnd, openCustomerPortal, openCheckout, loading } = useSubscription();
   const { toast } = useToast();
   const [loadingPortal, setLoadingPortal] = useState(false);
   const [loadingCheckout, setLoadingCheckout] = useState<string | null>(null);
+
+  const profilePlan = normalizePlan(profile?.plan);
+  const effectivePlan = subscriptionPlan !== "free" ? subscriptionPlan : profilePlan;
 
   const handleManageSubscription = async () => {
     setLoadingPortal(true);
@@ -83,31 +93,41 @@ const MyPlanTabContent = ({ profile }: { profile: UserProfile | null }) => {
     }
   };
 
+  const getPlanStyles = (planType: PlanType) => {
+    if (planType === "pro") {
+      return "border-primary/40 bg-gradient-to-br from-primary/10 via-background to-accent/5 ring-2 ring-primary/20 shadow-[0_0_30px_hsl(var(--primary)/0.15)]";
+    }
+    if (planType === "creator") {
+      return "border-accent/30 bg-gradient-to-br from-accent/8 via-background to-primary/5";
+    }
+    return "border-border hover:border-primary/30 bg-muted/30";
+  };
+
   const plans = [
     {
-      id: "free",
-      name: "Free",
+      id: "free" as PlanType,
+      name: STRIPE_PLANS.free.name,
       price: "$0",
       period: "/month",
       features: ["5 ideas per month", "2 videos per month", "3 platforms"],
       priceId: null,
     },
     {
-      id: "creator",
-      name: "Creator",
+      id: "creator" as PlanType,
+      name: STRIPE_PLANS.creator.name,
       price: "$14",
       period: "/month",
       features: ["100 ideas per month", "20 videos per month", "All platforms"],
-      priceId: "price_1SwoC8H0ScE1y6GM38RcxUcw",
+      priceId: STRIPE_PLANS.creator.monthly.priceId,
       popular: true,
     },
     {
-      id: "pro",
-      name: "Pro",
+      id: "pro" as PlanType,
+      name: STRIPE_PLANS.pro.name,
       price: "$29",
       period: "/month",
       features: ["Unlimited ideas", "Unlimited videos", "Priority processing"],
-      priceId: "price_1SwoCXH0ScE1y6GMgQlfMFgr",
+      priceId: STRIPE_PLANS.pro.monthly.priceId,
     },
   ];
 
@@ -130,21 +150,21 @@ const MyPlanTabContent = ({ profile }: { profile: UserProfile | null }) => {
         <CardContent>
           <div className="grid gap-4 sm:grid-cols-3">
             {plans.map((planOption) => {
-              const isCurrentPlan = plan === planOption.id;
+              const isCurrentPlan = effectivePlan === planOption.id;
               const canUpgrade = !isCurrentPlan && planOption.priceId;
               const isDowngrade = 
-                (plan === "pro" && planOption.id !== "pro") ||
-                (plan === "creator" && planOption.id === "free");
+                (effectivePlan === "pro" && planOption.id !== "pro") ||
+                (effectivePlan === "creator" && planOption.id === "free");
 
               return (
                 <div
                   key={planOption.id}
                   className={`relative rounded-xl border p-4 transition-all duration-200 ${
                     isCurrentPlan
-                      ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                      ? getPlanStyles(planOption.id)
                       : planOption.popular
-                      ? "border-primary/50 hover:border-primary"
-                      : "border-border hover:border-primary/30"
+                      ? getPlanStyles(planOption.id)
+                      : "border-border hover:border-primary/30 bg-muted/30"
                   }`}
                 >
                   {/* Current plan badge */}
@@ -241,12 +261,16 @@ const MyPlanTabContent = ({ profile }: { profile: UserProfile | null }) => {
 const SettingsPage = () => {
   const { profile, setProfile } = useOutletContext<DashboardContext>();
   const { user } = useAuth();
+  const { plan: subscriptionPlan } = useSubscription();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState("profile");
   const [fullName, setFullName] = useState(profile?.full_name || "");
   const [saving, setSaving] = useState(false);
+
+  const profilePlan = normalizePlan(profile?.plan);
+  const effectivePlan = subscriptionPlan !== "free" ? subscriptionPlan : profilePlan;
 
   useEffect(() => {
     const tab = searchParams.get("tab");
@@ -260,7 +284,7 @@ const SettingsPage = () => {
   }, [profile?.full_name]);
 
   const currentPlatforms = profile?.platforms ?? [];
-  const platformLimit = platformLimitForPlan(profile?.plan);
+  const platformLimit = platformLimitForPlan(effectivePlan);
 
   const handleSaveProfile = async () => {
     if (!user) return;

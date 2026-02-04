@@ -11,6 +11,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import type { UserProfile } from "@/components/dashboard/DashboardLayout";
+import { STRIPE_PLANS, PlanType } from "@/lib/stripe-config";
+import { useSubscription } from "@/hooks/useSubscription";
 
 interface DashboardContext {
   profile: UserProfile | null;
@@ -32,25 +34,82 @@ const itemVariants = {
 const UsagePage = () => {
   const { profile } = useOutletContext<DashboardContext>();
   const navigate = useNavigate();
+  const { plan: subscriptionPlan } = useSubscription();
 
-  const plan = (profile?.plan || "free").toLowerCase();
-  const generationsLimit = plan.includes("pro") ? 100 : plan.includes("creator") ? 50 : 10;
-  const videosLimit = plan.includes("pro") ? 20 : plan.includes("creator") ? 10 : 2;
+  const normalizePlan = (value?: string | null): PlanType => {
+    const normalized = (value ?? "").toLowerCase();
+    if (normalized.includes("pro")) return "pro";
+    if (normalized.includes("creator")) return "creator";
+    return "free";
+  };
 
-  const generationsUsed = generationsLimit - (profile?.monthly_generation_limit || 0);
-  const videosUsed = videosLimit - (profile?.monthly_video_limit || 0);
+  const profilePlan = normalizePlan(profile?.plan);
+  const effectivePlan = subscriptionPlan !== "free" ? subscriptionPlan : profilePlan;
+  const planConfig = STRIPE_PLANS[effectivePlan];
 
-  const generationsPercent = (generationsUsed / generationsLimit) * 100;
-  const videosPercent = (videosUsed / videosLimit) * 100;
+  const generationsLimit = planConfig.limits.ideasPerMonth;
+  const videosLimit = planConfig.limits.videosPerMonth;
+
+  // Cap remaining values to not exceed plan limits
+  const generationsRemaining = 
+    typeof generationsLimit === "number"
+      ? Math.min(profile?.monthly_generation_limit ?? generationsLimit, generationsLimit)
+      : profile?.monthly_generation_limit ?? null;
+  const videosRemaining = 
+    typeof videosLimit === "number"
+      ? Math.min(profile?.monthly_video_limit ?? videosLimit, videosLimit)
+      : profile?.monthly_video_limit ?? null;
+  
+  const generationsUsed = typeof generationsLimit === "number"
+    ? generationsLimit - (generationsRemaining ?? generationsLimit)
+    : profile?.generations_used_this_month ?? 0;
+  const videosUsed = typeof videosLimit === "number"
+    ? videosLimit - (videosRemaining ?? videosLimit)
+    : 0;
+
+  const clampPercent = (value: number) => Math.min(100, Math.max(0, value));
+  const generationsPercent =
+    typeof generationsLimit === "number" ? clampPercent((generationsUsed / generationsLimit) * 100) : 100;
+  const videosPercent =
+    typeof videosLimit === "number" ? clampPercent((videosUsed / videosLimit) * 100) : 100;
+
+  const formatLimit = (value: number | "unlimited") => (value === "unlimited" ? "Unlimited" : value);
+  const generationsLeftLabel = generationsLimit === "unlimited" ? "Unlimited" : generationsRemaining ?? generationsLimit;
+  const videosLeftLabel = videosLimit === "unlimited" ? "Unlimited" : videosRemaining ?? videosLimit;
+
+  const planStyles = {
+    free: {
+      card: "bg-muted/30 border-muted",
+      badge: "bg-muted text-muted-foreground",
+      icon: "text-muted-foreground",
+    },
+    creator: {
+      card: "bg-gradient-to-br from-accent/15 via-background to-primary/10 border-accent/30",
+      badge: "bg-accent/20 text-accent",
+      icon: "text-accent",
+    },
+    pro: {
+      card: "bg-gradient-to-br from-primary/20 via-background to-accent/10 border-primary/40 shadow-[0_0_30px_hsl(var(--primary)/0.15)]",
+      badge: "bg-primary/20 text-primary",
+      icon: "text-primary",
+    },
+  } as const;
 
   const getPlanFeatures = () => {
-    if (plan.includes("pro")) {
-      return ["100 text generations/month", "20 video analyses/month", "7 platforms", "Priority support"];
-    }
-    if (plan.includes("creator")) {
-      return ["50 text generations/month", "10 video analyses/month", "5 platforms", "Email support"];
-    }
-    return ["10 text generations/month", "2 video analyses/month", "3 platforms", "Community support"];
+    const ideasLabel = formatLimit(generationsLimit);
+    const videosLabel = formatLimit(videosLimit);
+    const platformsLabel =
+      planConfig.limits.platforms === "all"
+        ? "All platforms unlocked"
+        : `${planConfig.limits.platforms} platforms`;
+    const supportLabel =
+      effectivePlan === "pro"
+        ? "Priority processing"
+        : effectivePlan === "creator"
+        ? "Email support"
+        : "Community support";
+
+    return [`${ideasLabel} text generations/month`, `${videosLabel} video analyses/month`, platformsLabel, supportLabel];
   };
 
   return (
@@ -69,19 +128,26 @@ const UsagePage = () => {
 
         {/* Current Plan */}
         <motion.div variants={itemVariants}>
-          <Card className="bg-gradient-to-br from-primary/5 to-accent/5 border-primary/20">
+          <Card className={`${planStyles[effectivePlan].card}`}>
             <CardContent className="p-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center">
-                    <Zap className="h-7 w-7 text-primary" />
+                    <Zap className={`h-7 w-7 ${planStyles[effectivePlan].icon}`} />
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Current Plan</p>
-                    <p className="text-2xl font-bold text-foreground capitalize">{profile?.plan || "Free"}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-2xl font-bold text-foreground capitalize">
+                        {STRIPE_PLANS[effectivePlan].name}
+                      </p>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${planStyles[effectivePlan].badge}`}>
+                        {effectivePlan.toUpperCase()}
+                      </span>
+                    </div>
                   </div>
                 </div>
-                {!plan.includes("pro") && (
+                {effectivePlan !== "pro" && (
                   <Button variant="hero" className="gap-2" onClick={() => navigate("/pricing")}>
                     <Sparkles className="h-4 w-4" />
                     Upgrade Plan
@@ -106,17 +172,17 @@ const UsagePage = () => {
               <div className="flex justify-between items-end">
                 <div>
                   <p className="text-3xl font-bold text-foreground">{generationsUsed}</p>
-                  <p className="text-sm text-muted-foreground">of {generationsLimit} used this month</p>
+                  <p className="text-sm text-muted-foreground">of {formatLimit(generationsLimit)} used this month</p>
                 </div>
                 <p className="text-lg font-medium text-primary">
-                  {profile?.monthly_generation_limit || 0} left
+                  {generationsLeftLabel} left
                 </p>
               </div>
               <div className="space-y-2">
                 <Progress value={generationsPercent} className="h-3" />
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>0</span>
-                  <span>{generationsLimit}</span>
+                  <span>{formatLimit(generationsLimit)}</span>
                 </div>
               </div>
             </CardContent>
@@ -133,17 +199,17 @@ const UsagePage = () => {
               <div className="flex justify-between items-end">
                 <div>
                   <p className="text-3xl font-bold text-foreground">{videosUsed}</p>
-                  <p className="text-sm text-muted-foreground">of {videosLimit} used this month</p>
+                  <p className="text-sm text-muted-foreground">of {formatLimit(videosLimit)} used this month</p>
                 </div>
                 <p className="text-lg font-medium text-accent">
-                  {profile?.monthly_video_limit || 0} left
+                  {videosLeftLabel} left
                 </p>
               </div>
               <div className="space-y-2">
                 <Progress value={videosPercent} className="h-3 [&>div]:bg-accent" />
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>0</span>
-                  <span>{videosLimit}</span>
+                  <span>{formatLimit(videosLimit)}</span>
                 </div>
               </div>
             </CardContent>
@@ -178,12 +244,12 @@ const UsagePage = () => {
         </motion.div>
 
         {/* Upgrade CTA for Free/Creator users */}
-        {!plan.includes("pro") && (
+        {effectivePlan !== "pro" && (
           <motion.div variants={itemVariants}>
             <Card className="bg-muted/50 border-0">
               <CardContent className="p-6 text-center">
                 <p className="text-muted-foreground mb-4">
-                  You're using Postr on {profile?.plan || "Free"}. Upgrade to unlock more platforms and generations.
+                  You're using Postr on {STRIPE_PLANS[effectivePlan].name}. Upgrade to unlock more platforms and generations.
                 </p>
                 <Button variant="outline" onClick={() => navigate("/pricing")}>
                   Compare Plans

@@ -28,6 +28,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
+import { useSubscription } from "@/hooks/useSubscription";
+import { STRIPE_PLANS, PlanType } from "@/lib/stripe-config";
 import type { UserProfile } from "./DashboardLayout";
 
 interface DashboardSidebarProps {
@@ -53,6 +55,7 @@ const DashboardSidebar = ({ profile, collapsed, onToggleCollapse }: DashboardSid
   const navigate = useNavigate();
   const { signOut } = useAuth();
   const { isAdmin } = useRole();
+  const { plan: subscriptionPlan } = useSubscription();
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const handleSignOut = async () => {
@@ -67,10 +70,19 @@ const DashboardSidebar = ({ profile, collapsed, onToggleCollapse }: DashboardSid
     return email[0].toUpperCase();
   };
 
-  const getPlanBadgeColor = (plan: string | null) => {
-    const p = (plan ?? "free").toLowerCase();
-    if (p.includes("pro")) return "bg-primary/20 text-primary";
-    if (p.includes("creator")) return "bg-accent/20 text-accent";
+  const normalizePlan = (value?: string | null): PlanType => {
+    const normalized = (value ?? "").toLowerCase();
+    if (normalized.includes("pro")) return "pro";
+    if (normalized.includes("creator")) return "creator";
+    return "free";
+  };
+
+  const profilePlan = normalizePlan(profile?.plan);
+  const effectivePlan = subscriptionPlan !== "free" ? subscriptionPlan : profilePlan;
+
+  const getPlanBadgeColor = (plan: PlanType) => {
+    if (plan === "pro") return "bg-primary/20 text-primary shadow-[0_0_16px_hsl(var(--primary)/0.25)]";
+    if (plan === "creator") return "bg-accent/20 text-accent";
     return "bg-muted text-muted-foreground";
   };
 
@@ -258,8 +270,8 @@ const DashboardSidebar = ({ profile, collapsed, onToggleCollapse }: DashboardSid
                     <p className="text-sm font-medium text-sidebar-foreground truncate">
                       {profile?.full_name || profile?.email?.split("@")[0] || "User"}
                     </p>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${getPlanBadgeColor(profile?.plan)}`}>
-                      {(profile?.plan || "Free").charAt(0).toUpperCase() + (profile?.plan || "free").slice(1)}
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${getPlanBadgeColor(effectivePlan)}`}>
+                      {STRIPE_PLANS[effectivePlan].name}
                     </span>
                   </motion.div>
                 )}

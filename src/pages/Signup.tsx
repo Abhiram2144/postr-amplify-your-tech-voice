@@ -33,7 +33,7 @@ const GoogleIcon = () => (
 );
 
 const benefits = [
-  "Free plan with 10 generations/month",
+  "Free plan with 5 generations/month",
   "No credit card required",
   "Cancel anytime",
 ];
