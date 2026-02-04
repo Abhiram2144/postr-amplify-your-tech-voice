@@ -35,6 +35,7 @@ import { useToast } from "@/hooks/use-toast";
 import InsufficientCreditsModal from "@/components/dashboard/InsufficientCreditsModal";
 import CreditsIndicator from "@/components/dashboard/CreditsIndicator";
 import type { UserProfile } from "@/components/dashboard/DashboardLayout";
+import { isValidVideoUrl, isValidVideoFile, detectVideoPlatform, getPlatformDisplayName } from "@/lib/video-utils";
 
 interface DashboardContext {
   profile: UserProfile | null;
@@ -222,6 +223,11 @@ const GeneratePage = () => {
   // Script Mode Input
   const [scriptText, setScriptText] = useState("");
   
+  // Video Mode Inputs
+  const [videoUrl, setVideoUrl] = useState("");
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoInputMethod, setVideoInputMethod] = useState<"url" | "upload">("url");
+  
   // Platforms come from user profile (set during onboarding or in settings) - not selectable here
   const userPlatforms = profile?.platforms || ["linkedin", "twitter"];
   
@@ -287,10 +293,15 @@ const GeneratePage = () => {
       if (userPlatforms.length === 0) return false;
       if (creationMode === "brief_topic") return topic.trim().length >= 3;
       if (creationMode === "script") return scriptText.trim().length >= 50;
-      if (creationMode === "video") return true; // Mock mode
+      if (creationMode === "video") {
+        if (videoInputMethod === "url") {
+          return videoUrl.trim().length > 0 && isValidVideoUrl(videoUrl);
+        }
+        return videoFile !== null;
+      }
     }
     return true;
-  }, [currentStep, creationMode, topic, scriptText, userPlatforms.length]);
+  }, [currentStep, creationMode, topic, scriptText, userPlatforms.length, videoInputMethod, videoUrl, videoFile]);
 
   const persistOutputs = async (projectId: string | null, payload: { analysis: AnalysisResult; outputs: PlatformOutput[] }, source: 'ai' | 'mock' | 'video_transcript' = 'ai') => {
     if (!projectId) return;
@@ -664,15 +675,12 @@ const GeneratePage = () => {
                     </Button>
                     <Button
                       variant={creationMode === "video" ? "default" : "outline"}
-                      className="h-auto py-4 flex-col gap-2 relative"
+                      className="h-auto py-4 flex-col gap-2"
                       onClick={() => setCreationMode("video")}
                     >
                       <Video className="h-6 w-6" />
                       <span className="font-medium">Video</span>
-                      <span className="text-xs opacity-70">Demo mode</span>
-                      <Badge variant="secondary" className="absolute -top-2 -right-2 text-[10px]">
-                        Preview
-                      </Badge>
+                      <span className="text-xs opacity-70">Analyze & generate</span>
                     </Button>
                   </div>
                 </CardContent>
@@ -684,7 +692,7 @@ const GeneratePage = () => {
                   <CardTitle className="text-lg">
                     {creationMode === "brief_topic" && "What's Your Topic?"}
                     {creationMode === "script" && "Paste Your Script"}
-                    {creationMode === "video" && "Upload Video"}
+                    {creationMode === "video" && "Add Your Video"}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -764,31 +772,122 @@ const GeneratePage = () => {
 
                   {creationMode === "video" && (
                     <div className="space-y-4">
-                      <div className="border-2 border-dashed border-muted-foreground/30 rounded-xl p-12 text-center bg-muted/20 relative overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-muted/40 to-transparent flex items-center justify-center z-0" />
-                        <div className="relative z-10 flex flex-col items-center gap-4">
-                          <div className="h-16 w-16 rounded-2xl bg-background border border-muted flex items-center justify-center">
-                            <Video className="h-8 w-8 text-muted-foreground" />
-                          </div>
-                          <div>
-                            <p className="font-medium text-foreground">Drop your video here</p>
-                            <p className="text-sm text-muted-foreground">or click to browse</p>
-                          </div>
-                          <Lock className="h-5 w-5 text-muted-foreground absolute top-4 right-4" />
-                        </div>
+                      {/* Input method toggle */}
+                      <div className="flex gap-2 p-1 bg-muted rounded-lg">
+                        <Button
+                          type="button"
+                          variant={videoInputMethod === "url" ? "default" : "ghost"}
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => setVideoInputMethod("url")}
+                        >
+                          Paste Link
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={videoInputMethod === "upload" ? "default" : "ghost"}
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => setVideoInputMethod("upload")}
+                        >
+                          Upload File
+                        </Button>
                       </div>
-                      
-                      <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
-                        <div className="flex gap-3">
-                          <AlertCircle className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                          <div className="space-y-1">
-                            <p className="text-sm font-medium text-primary">Demo Mode Active</p>
-                            <p className="text-sm text-muted-foreground">
-                              Click "Generate" to see a preview of how video analysis will work. We'll show a sample transcript, analysis, and platform-ready outputs.
+
+                      {/* URL Input */}
+                      {videoInputMethod === "url" && (
+                        <div className="space-y-2">
+                          <Label htmlFor="videoUrl">Video URL</Label>
+                          <Input
+                            id="videoUrl"
+                            type="url"
+                            placeholder="Paste YouTube Shorts, TikTok, or Instagram video link"
+                            value={videoUrl}
+                            onChange={(e) => setVideoUrl(e.target.value)}
+                          />
+                          {videoUrl && isValidVideoUrl(videoUrl) && (
+                            <div className="flex items-center gap-2 text-sm text-green-600">
+                              <Check className="h-4 w-4" />
+                              <span>Valid {getPlatformDisplayName(detectVideoPlatform(videoUrl))} video detected</span>
+                            </div>
+                          )}
+                          {videoUrl && !isValidVideoUrl(videoUrl) && (
+                            <p className="text-sm text-destructive">
+                              Invalid URL. Please paste a YouTube Shorts, TikTok, or Instagram Reels link.
                             </p>
+                          )}
+                          <p className="text-xs text-muted-foreground">
+                            Supported: YouTube Shorts, TikTok, Instagram Reels
+                          </p>
+                        </div>
+                      )}
+
+                      {/* File Upload */}
+                      {videoInputMethod === "upload" && (
+                        <div className="space-y-2">
+                          <Label htmlFor="videoFile">Upload Video File</Label>
+                          <div className="border-2 border-dashed border-muted-foreground/30 rounded-xl p-8 text-center bg-muted/20 relative overflow-hidden hover:border-primary/50 transition-colors">
+                            <input
+                              id="videoFile"
+                              type="file"
+                              accept="video/mp4,video/mov,video/webm,video/quicktime"
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const validation = isValidVideoFile(file);
+                                  if (!validation.valid) {
+                                    toast({
+                                      title: "Invalid file",
+                                      description: validation.error,
+                                      variant: "destructive",
+                                    });
+                                    e.target.value = "";
+                                    return;
+                                  }
+                                  setVideoFile(file);
+                                }
+                              }}
+                            />
+                            <div className="relative z-0 flex flex-col items-center gap-3">
+                              <div className="h-12 w-12 rounded-xl bg-background border border-muted flex items-center justify-center">
+                                <Video className="h-6 w-6 text-muted-foreground" />
+                              </div>
+                              {videoFile ? (
+                                <div>
+                                  <p className="font-medium text-foreground">{videoFile.name}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {(videoFile.size / 1024 / 1024).toFixed(2)} MB
+                                  </p>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="mt-2"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setVideoFile(null);
+                                      // Reset the input
+                                      const input = document.getElementById("videoFile") as HTMLInputElement;
+                                      if (input) input.value = "";
+                                    }}
+                                  >
+                                    Remove
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div>
+                                  <p className="font-medium text-foreground">Drop your video here</p>
+                                  <p className="text-sm text-muted-foreground">or click to browse</p>
+                                  <p className="text-xs text-muted-foreground mt-2">
+                                    MP4, MOV, WebM (max 100MB)
+                                  </p>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   )}
 
@@ -1142,15 +1241,15 @@ const GeneratePage = () => {
                 </CardContent>
               </Card>
 
-              {creationMode === "video" && (
+              {creationMode === "video" && testingMode && (
                 <Card className="mt-4 border-dashed">
                   <CardContent className="pt-6">
                     <div className="flex items-start gap-3">
-                      <Video className="h-5 w-5 text-muted-foreground mt-0.5" />
+                      <AlertCircle className="h-5 w-5 text-primary mt-0.5" />
                       <div className="space-y-1">
-                        <p className="font-medium text-foreground">Demo Transcript Used</p>
+                        <p className="font-medium text-foreground">Demo Mode Active</p>
                         <p className="text-sm text-muted-foreground">
-                          This output was generated from a sample transcript. When video upload is available, you'll get personalized content based on your actual video.
+                          This output was generated from sample data for demonstration. Video analysis and transcription will be processed when you submit a real video URL or file.
                         </p>
                       </div>
                     </div>
