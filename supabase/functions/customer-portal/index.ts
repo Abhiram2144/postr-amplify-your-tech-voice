@@ -8,8 +8,45 @@ const corsHeaders = {
 };
 
 const logStep = (step: string, details?: Record<string, unknown>) => {
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  const sanitized = details ? sanitizeForLog(details) : undefined;
+  const detailsStr = sanitized ? ` - ${JSON.stringify(sanitized)}` : '';
   console.log(`[CUSTOMER-PORTAL] ${step}${detailsStr}`);
+};
+
+// Sanitize log values
+const sanitizeForLog = (value: unknown): unknown => {
+  if (typeof value === "string") {
+    return value.replace(/[\n\r\t\x00-\x1F]/g, " ").substring(0, 200);
+  }
+  if (typeof value === "object" && value !== null) {
+    const sanitized: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value)) {
+      sanitized[key] = sanitizeForLog(val);
+    }
+    return sanitized;
+  }
+  return value;
+};
+
+// Safe error messages
+const getSafeErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    const msg = error.message.toLowerCase();
+    if (msg.includes("not authenticated") || msg.includes("jwt") ||
+        msg.includes("authorization") || msg.includes("no authorization header")) {
+      return "Authentication required. Please log in again.";
+    }
+    if (msg.includes("stripe") || msg.includes("customer") || msg.includes("portal")) {
+      return "Billing portal error. Please try again or contact support.";
+    }
+    if (msg.includes("not set") || msg.includes("not configured")) {
+      return "Service temporarily unavailable. Please try again later.";
+    }
+    if (msg.includes("no stripe customer")) {
+      return "No billing account found. Please subscribe to a plan first.";
+    }
+  }
+  return "An error occurred. Please try again later.";
 };
 
 serve(async (req) => {
@@ -37,7 +74,7 @@ serve(async (req) => {
     if (userError) throw new Error(`Authentication error: ${userError.message}`);
     const user = userData.user;
     if (!user?.email) throw new Error("User not authenticated or email not available");
-    logStep("User authenticated", { userId: user.id, email: user.email });
+    logStep("User authenticated", { userId: user.id });
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
@@ -45,23 +82,25 @@ serve(async (req) => {
       throw new Error("No Stripe customer found for this user");
     }
     const customerId = customers.data[0].id;
-    logStep("Found Stripe customer", { customerId });
+    logStep("Found Stripe customer");
 
     const origin = req.headers.get("origin") || "https://postr-genius.lovable.app";
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: customerId,
       return_url: `${origin}/dashboard/settings`,
     });
-    logStep("Customer portal session created", { sessionId: portalSession.id });
+    logStep("Customer portal session created");
 
     return new Response(JSON.stringify({ url: portalSession.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("ERROR", { message: errorMessage });
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    const detailedError = error instanceof Error ? error.message : String(error);
+    logStep("ERROR", { message: detailedError });
+    
+    const safeMessage = getSafeErrorMessage(error);
+    return new Response(JSON.stringify({ error: safeMessage }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
     });

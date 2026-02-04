@@ -1,15 +1,105 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Sanitize log values to prevent log injection
+const sanitizeForLog = (value: unknown): unknown => {
+  if (typeof value === "string") {
+    return value.replace(/[\n\r\t\x00-\x1F]/g, " ").substring(0, 200);
+  }
+  if (typeof value === "object" && value !== null) {
+    const sanitized: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value)) {
+      sanitized[key] = sanitizeForLog(val);
+    }
+    return sanitized;
+  }
+  return value;
+};
+
 const logStep = (step: string, details?: Record<string, unknown>) => {
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  const sanitized = details ? sanitizeForLog(details) : undefined;
+  const detailsStr = sanitized ? ` - ${JSON.stringify(sanitized)}` : '';
   console.log(`[GENERATE-CONTENT] ${step}${detailsStr}`);
 };
+
+// Safe error messages
+const getSafeErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    const msg = error.message.toLowerCase();
+
+    // Pass through intentional user-facing errors
+    if (msg.includes("insufficient_credits") || msg.includes("limit exceeded") ||
+        msg.includes("limit reached") || msg.includes("at least one platform")) {
+      return error.message;
+    }
+
+    // Auth errors
+    if (msg.includes("not authenticated") || msg.includes("jwt") ||
+        msg.includes("authorization") || msg.includes("no authorization header")) {
+      return "Authentication required. Please log in again.";
+    }
+
+    // Configuration errors
+    if (msg.includes("not set") || msg.includes("not configured") ||
+        msg.includes("_key") || msg.includes("_secret")) {
+      return "Service temporarily unavailable. Please try again later.";
+    }
+
+    // Validation errors - pass through with generic message
+    if (msg.includes("required") || msg.includes("invalid") ||
+        msg.includes("must be") || msg.includes("at least")) {
+      return "Invalid request. Please check your input and try again.";
+    }
+
+    // Database/profile errors
+    if (msg.includes("profile") || msg.includes("database") ||
+        msg.includes("supabase") || msg.includes("failed to get")) {
+      return "Unable to load your profile. Please try again.";
+    }
+
+    // AI/generation errors
+    if (msg.includes("ai") || msg.includes("gateway") || msg.includes("parse")) {
+      return "Content generation failed. Please try again.";
+    }
+
+    // Rate limiting
+    if (msg.includes("rate") || msg.includes("too many") || msg.includes("429")) {
+      return "Too many requests. Please try again in a moment.";
+    }
+  }
+
+  return "An error occurred. Please try again later.";
+};
+
+// Input validation schema
+const generateContentSchema = z.object({
+  mode: z.enum(["brief_topic", "script"]),
+  topic: z.string().max(500, "Topic too long").optional(),
+  audience: z.string().max(200, "Audience description too long").optional(),
+  intent: z.string().max(200, "Intent too long").optional(),
+  tone: z.string().max(200, "Tone too long").optional(),
+  script_text: z.string().max(10000, "Script too long").optional(),
+  platforms: z.array(
+    z.string().max(50)
+  ).min(1, "At least one platform must be selected").max(6, "Maximum 6 platforms allowed"),
+}).refine(
+  (data) => {
+    if (data.mode === "brief_topic") {
+      return !!data.topic && data.topic.trim().length > 0;
+    }
+    if (data.mode === "script") {
+      return !!data.script_text && data.script_text.length >= 50;
+    }
+    return false;
+  },
+  { message: "Topic required for brief_topic mode, script_text (min 50 chars) required for script mode" }
+);
 
 // Platform-specific formatting instructions
 const PLATFORM_INSTRUCTIONS: Record<string, string> = {
@@ -20,16 +110,6 @@ const PLATFORM_INSTRUCTIONS: Record<string, string> = {
   threads: "Format for Threads: Conversational, authentic, use line breaks, can be longer than Twitter. Start with a hot take or question.",
   reddit: "Format for Reddit: Use markdown with bold headers, be informative, invite discussion, match the subreddit style. Include a TL;DR if long.",
 };
-
-interface GenerateRequest {
-  mode: "brief_topic" | "script";
-  topic?: string;
-  audience?: string;
-  intent?: string;
-  tone?: string;
-  script_text?: string;
-  platforms: string[];
-}
 
 interface AnalysisResult {
   clarityScore: number;
@@ -70,6 +150,24 @@ serve(async (req) => {
     if (!user?.id) throw new Error("User not authenticated");
     logStep("User authenticated", { userId: user.id });
 
+    // Validate request body
+    const body = await req.json();
+    const validation = generateContentSchema.safeParse(body);
+    
+    if (!validation.success) {
+      logStep("Validation failed", { errors: validation.error.issues.map(i => i.message) });
+      return new Response(
+        JSON.stringify({ 
+          error: "Invalid request parameters",
+          details: validation.error.issues.map(i => i.message)
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    const { mode, topic, audience, intent, tone, script_text, platforms } = validation.data;
+    logStep("Request validated", { mode, platformCount: platforms.length });
+
     // Get user plan and usage
     const { data: userProfile, error: profileError } = await supabaseClient
       .from("users")
@@ -104,15 +202,6 @@ serve(async (req) => {
       });
     }
 
-    // Parse request
-    const body: GenerateRequest = await req.json();
-    const { mode, topic, audience, intent, tone, script_text, platforms } = body;
-    logStep("Request parsed", { mode, platforms });
-
-    if (!platforms || platforms.length === 0) {
-      throw new Error("At least one platform must be selected");
-    }
-
     // Get Lovable AI key
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
@@ -121,7 +210,6 @@ serve(async (req) => {
     let contentPrompt: string;
     
     if (mode === "brief_topic") {
-      if (!topic) throw new Error("Topic is required for brief_topic mode");
       contentPrompt = `
 You are a content creation expert. Create engaging social media content based on this brief:
 
@@ -133,10 +221,7 @@ Tone: ${tone || "Casual"}
 First, analyze what would make compelling content about this topic for the target audience.
 Then create platform-specific versions that feel native to each platform.
 `;
-    } else if (mode === "script") {
-      if (!script_text || script_text.length < 50) {
-        throw new Error("Script must be at least 50 characters for script mode");
-      }
+    } else {
       contentPrompt = `
 You are a content analysis and improvement expert. Analyze and improve this script while preserving the author's voice and intent:
 
@@ -148,8 +233,6 @@ Your tasks:
 2. Identify strengths and areas for improvement
 3. Create improved versions for each requested platform
 `;
-    } else {
-      throw new Error(`Invalid mode: ${mode}`);
     }
 
     // Build platform instructions
@@ -206,7 +289,7 @@ Return ONLY valid JSON, no markdown code blocks or additional text.`;
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      logStep("AI gateway error", { status: aiResponse.status, error: errorText });
+      logStep("AI gateway error", { status: aiResponse.status });
       
       if (aiResponse.status === 429) {
         return new Response(JSON.stringify({ error: "rate_limited", message: "Too many requests. Please try again in a moment." }), {
@@ -239,7 +322,7 @@ Return ONLY valid JSON, no markdown code blocks or additional text.`;
       const cleanedContent = aiContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       parsedResponse = JSON.parse(cleanedContent);
     } catch (parseError) {
-      logStep("Failed to parse AI response", { error: String(parseError), content: aiContent.substring(0, 500) });
+      logStep("Failed to parse AI response");
       throw new Error("Failed to parse AI response");
     }
 
@@ -254,7 +337,7 @@ Return ONLY valid JSON, no markdown code blocks or additional text.`;
       .eq("id", user.id);
 
     if (updateError) {
-      logStep("Failed to update usage", { error: updateError.message });
+      logStep("Failed to update usage");
       // Don't fail the request, just log it
     }
 
@@ -282,9 +365,11 @@ Return ONLY valid JSON, no markdown code blocks or additional text.`;
     });
 
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("ERROR", { message: errorMessage });
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    const detailedError = error instanceof Error ? error.message : String(error);
+    logStep("ERROR", { message: sanitizeForLog(detailedError) });
+    
+    const safeMessage = getSafeErrorMessage(error);
+    return new Response(JSON.stringify({ error: safeMessage }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
     });
