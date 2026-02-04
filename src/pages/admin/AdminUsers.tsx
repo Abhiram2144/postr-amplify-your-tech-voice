@@ -30,6 +30,7 @@ interface User {
   status: string | null;
   created_at: string | null;
   monthly_generation_limit: number | null;
+  generations_used_this_month: number | null;
 }
 
 const containerVariants = {
@@ -55,7 +56,7 @@ const AdminUsers = () => {
     try {
       const { data, error } = await supabase
         .from("users")
-        .select("id, email, full_name, plan, status, created_at, monthly_generation_limit")
+        .select("id, email, full_name, plan, status, created_at, monthly_generation_limit, generations_used_this_month")
         .order("created_at", { ascending: false })
         .limit(100);
 

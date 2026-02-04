@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { BarChart3, FileText, Video, Users, Zap, TrendingDown, TrendingUp } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
@@ -48,12 +47,12 @@ const AdminUsage = () => {
   useEffect(() => {
     const fetchUsage = async () => {
       try {
-        // Fetch usage logs
-        const { data: logs, error: logsError } = await supabase
-          .from("usage_logs")
-          .select("action, units, user_id");
+        // Fetch content outputs to calculate usage
+        const { data: outputs, error: outputsError } = await supabase
+          .from("content_outputs")
+          .select("generation_id, input_type, project_id");
 
-        if (logsError) throw logsError;
+        if (outputsError) throw outputsError;
 
         // Fetch users for email lookup
         const { data: users } = await supabase
@@ -62,24 +61,64 @@ const AdminUsage = () => {
 
         const userMap = new Map(users?.map(u => [u.id, u.email]) || []);
 
-        // Calculate stats
-        const totalGenerations = logs?.filter(l => l.action === "generation").reduce((sum, l) => sum + (l.units || 1), 0) || 0;
-        const totalVideos = logs?.filter(l => l.action === "video").reduce((sum, l) => sum + (l.units || 1), 0) || 0;
+        // Count distinct generations (one credit per generation_id)
+        const textGenerationIds = new Set<string>();
+        const videoGenerationIds = new Set<string>();
 
-        // Calculate per-user usage
-        const userUsage = new Map<string, number>();
-        logs?.forEach(log => {
-          if (log.user_id) {
-            userUsage.set(log.user_id, (userUsage.get(log.user_id) || 0) + (log.units || 1));
+        outputs?.forEach((row) => {
+          if (!row.generation_id) return;
+          if (row.input_type === "video") {
+            videoGenerationIds.add(row.generation_id);
+          } else {
+            textGenerationIds.add(row.generation_id);
           }
         });
 
-        const averagePerUser = userUsage.size > 0 
-          ? Math.round((totalGenerations + totalVideos) / userUsage.size) 
+        const totalGenerations = textGenerationIds.size;
+        const totalVideos = videoGenerationIds.size;
+
+        // Calculate per-user usage (by project owner via project_id lookup)
+        const userUsage = new Map<string, number>();
+        const projectOwners = new Map<string, string>();
+
+        if (outputs && outputs.length > 0) {
+          const projectIds = Array.from(new Set(outputs.map(o => o.project_id).filter(Boolean) as string[]));
+          if (projectIds.length > 0) {
+            const { data: projects } = await supabase
+              .from("projects")
+              .select("id, user_id")
+              .in("id", projectIds);
+
+            projects?.forEach((p) => {
+              projectOwners.set(p.id, p.user_id);
+            });
+          }
+        }
+
+        outputs?.forEach((row) => {
+          if (!row.project_id) return;
+          const ownerId = projectOwners.get(row.project_id);
+          if (!ownerId) return;
+          const key = `${ownerId}:${row.generation_id}`;
+          if (row.input_type === "video") {
+            userUsage.set(key, 1);
+          } else {
+            userUsage.set(key, 1);
+          }
+        });
+
+        const perUserCounts = new Map<string, number>();
+        Array.from(userUsage.keys()).forEach((key) => {
+          const [userId] = key.split(":");
+          perUserCounts.set(userId, (perUserCounts.get(userId) || 0) + 1);
+        });
+
+        const averagePerUser = perUserCounts.size > 0 
+          ? Math.round((totalGenerations + totalVideos) / perUserCounts.size) 
           : 0;
 
         // Get top users
-        const topUsers = Array.from(userUsage.entries())
+        const topUsers = Array.from(perUserCounts.entries())
           .sort((a, b) => b[1] - a[1])
           .slice(0, 5)
           .map(([userId, count]) => ({
