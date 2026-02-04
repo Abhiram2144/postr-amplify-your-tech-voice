@@ -332,21 +332,20 @@ const HistoryPage = () => {
                     </motion.div>
                   </button>
 
-                  {/* Action Menu */}
-                  <div className="flex justify-end">
-                    <ContentActionMenu
-                      onView={() => {
-                        setViewGenerationId(gen.generation_id);
-                        setViewOpen(true);
-                      }}
-                      onCopy={() => {
-                        handleCopy(gen.generation_id, gen.representative.content || "");
-                      }}
-                      onDelete={() => deleteGeneration(gen.generation_id)}
-                      isCopied={copiedId === gen.generation_id}
-                    />
-                  </div>
-                </motion.div>
+                    {/* Action Menu */}
+                    <div className="flex justify-end">
+                      <ContentActionMenu
+                        onView={() => {
+                          setViewGenerationId(gen.generation_id);
+                          setViewOpen(true);
+                        }}
+                        onCopy={() => {
+                          handleCopy(gen.generation_id, gen.representative.content || "");
+                        }}
+                        isCopied={copiedId === gen.generation_id}
+                      />
+                    </div>
+                  </motion.div>
               ))}
             </motion.div>
           </AnimatePresence>
