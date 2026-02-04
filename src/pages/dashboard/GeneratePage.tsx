@@ -169,6 +169,14 @@ interface PlatformOutput {
   content: string;
 }
 
+interface OutputVariant {
+  id: string;
+  label: string;
+  analysis: AnalysisResult;
+  outputs: PlatformOutput[];
+  createdAt: string;
+}
+
 type GenerateResponse = {
   analysis: AnalysisResult;
   outputs: PlatformOutput[];
@@ -217,6 +225,8 @@ const GeneratePage = () => {
   // Results
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [outputs, setOutputs] = useState<PlatformOutput[]>([]);
+  const [outputVariants, setOutputVariants] = useState<OutputVariant[]>([]);
+  const [selectedVariantByPlatform, setSelectedVariantByPlatform] = useState<Record<string, string>>({});
 
   useEffect(() => {
     // Prefill topic from URL (e.g. converting a note -> generate)
@@ -307,14 +317,14 @@ const GeneratePage = () => {
     if (error) throw error;
   };
 
-  const handleCopy = async (platform: string, content: string) => {
+  const handleCopy = async (copyKey: string, content: string, label: string) => {
     await navigator.clipboard.writeText(content);
-    setCopiedPlatform(platform);
-    toast({ title: "Copied!", description: `${platform} content copied to clipboard` });
+    setCopiedPlatform(copyKey);
+    toast({ title: "Copied!", description: `${label} content copied to clipboard` });
     setTimeout(() => setCopiedPlatform(null), 2000);
   };
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (append = false) => {
     // Check credits for text generation
     if (creationMode !== "video" && creditsRemaining <= 0) {
       setShowCreditsModal(true);
@@ -325,18 +335,17 @@ const GeneratePage = () => {
     if (creationMode === "video") {
       setIsProcessing(true);
       setTimeout(() => {
-        setAnalysis(MOCK_VIDEO_ANALYSIS.analysis);
-        setOutputs(MOCK_VIDEO_ANALYSIS.outputs);
-        persistOutputs(selectedProjectId, { analysis: MOCK_VIDEO_ANALYSIS.analysis, outputs: MOCK_VIDEO_ANALYSIS.outputs }, 'mock') // Mark as mock
+        addOutputVariant({ analysis: MOCK_VIDEO_ANALYSIS.analysis, outputs: MOCK_VIDEO_ANALYSIS.outputs }, append);
+        persistOutputs(selectedProjectId, { analysis: MOCK_VIDEO_ANALYSIS.analysis, outputs: MOCK_VIDEO_ANALYSIS.outputs }, "mock")
           .then(() => {
             if (selectedProjectId) {
               toast({
-                title: "Saved to project",
+                title: append ? "Another version generated" : "Saved to project",
                 description: selectedProjectLabel ? `Saved under "${selectedProjectLabel}".` : "Saved under your selected project.",
               });
             } else {
               toast({
-                title: "Generated",
+                title: append ? "Another version generated" : "Generated",
                 description: "Not saved — link a project to save this output.",
               });
             }
@@ -352,7 +361,9 @@ const GeneratePage = () => {
             }
           });
         setIsProcessing(false);
-        setCurrentStep(2);
+        if (!append) {
+          setCurrentStep(2);
+        }
       }, 1500);
       return;
     }
@@ -389,21 +400,20 @@ const GeneratePage = () => {
         };
       })();
 
-      setAnalysis(generated.analysis);
-      setOutputs(generated.outputs);
+      addOutputVariant({ analysis: generated.analysis, outputs: generated.outputs }, append);
 
       // Persist generated outputs to the selected project (mark as 'ai' source)
-      await persistOutputs(selectedProjectId, { analysis: generated.analysis, outputs: generated.outputs }, 'ai');
+      await persistOutputs(selectedProjectId, { analysis: generated.analysis, outputs: generated.outputs }, "ai");
       
       // Update credits in hook
       if (generated.credits?.used !== undefined) {
         updateCreditsAfterGeneration(generated.credits.used);
       }
       
-      setCurrentStep(2);
+      setCurrentStep(append ? 4 : 2);
       
       toast({
-        title: "Content Generated!",
+        title: append ? "Another version generated" : "Content Generated!",
         description: selectedProjectId
           ? `Saved under "${selectedProjectLabel || "your project"}". ${generated.credits?.remaining ?? creditsRemaining - 1} credits remaining.`
           : `Generated (not saved). ${generated.credits?.remaining ?? creditsRemaining - 1} credits remaining.`,
@@ -429,16 +439,60 @@ const GeneratePage = () => {
     setCurrentStep(1);
     setAnalysis(null);
     setOutputs([]);
+    setOutputVariants([]);
+    setSelectedVariantByPlatform({});
   };
 
-  const getFilteredOutputs = () => {
-    return outputs.filter(o => 
+  const getFilteredOutputs = (variantOutputs: PlatformOutput[]) => {
+    return variantOutputs.filter(o => 
       userPlatforms.some(sp => 
         o.platform.toLowerCase().includes(sp.toLowerCase()) ||
         sp.toLowerCase().includes(o.platform.toLowerCase())
       )
     );
   };
+
+  const addOutputVariant = (payload: { analysis: AnalysisResult; outputs: PlatformOutput[] }, append: boolean) => {
+    const newId = crypto.randomUUID();
+    setAnalysis(payload.analysis);
+    setOutputs(payload.outputs);
+    setOutputVariants((prev) => {
+      const next = append
+        ? [...prev, { id: newId, label: `Option ${prev.length + 1}`, analysis: payload.analysis, outputs: payload.outputs, createdAt: new Date().toISOString() }]
+        : [{ id: newId, label: "Option 1", analysis: payload.analysis, outputs: payload.outputs, createdAt: new Date().toISOString() }];
+      return next;
+    });
+    setSelectedVariantByPlatform((prev) => {
+      const next = { ...prev };
+      payload.outputs.forEach((output) => {
+        const key = output.platform.toLowerCase();
+        if (!next[key]) {
+          next[key] = newId;
+        }
+      });
+      return next;
+    });
+  };
+
+  const getAllPlatforms = () => {
+    const platforms = new Map<string, PlatformOutput>();
+    outputVariants.forEach((variant) => {
+      getFilteredOutputs(variant.outputs).forEach((output) => {
+        const key = output.platform.toLowerCase();
+        if (!platforms.has(key)) {
+          platforms.set(key, output);
+        }
+      });
+    });
+    return Array.from(platforms.values());
+  };
+
+  const handleGenerateAnother = async () => {
+    if (isProcessing) return;
+    await handleGenerate(true);
+  };
+
+  const platformTabs = getAllPlatforms();
 
   return (
     <div className="p-6 lg:p-8 max-w-4xl mx-auto">
@@ -745,7 +799,7 @@ const GeneratePage = () => {
                   size="lg"
                   className="gap-2"
                   disabled={!canProceed() || isProcessing}
-                  onClick={handleGenerate}
+                  onClick={() => handleGenerate(false)}
                 >
                   {isProcessing ? (
                     <>
@@ -898,7 +952,7 @@ const GeneratePage = () => {
           )}
 
           {/* Step 4: Outputs */}
-          {currentStep === 4 && outputs.length > 0 && (
+          {currentStep === 4 && outputVariants.length > 0 && (
             <motion.div
               key="step4"
               initial={{ opacity: 0, x: 20 }}
@@ -907,65 +961,120 @@ const GeneratePage = () => {
               transition={{ duration: 0.3 }}
             >
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Your Content</CardTitle>
-                  <CardDescription>Platform-optimized versions ready to post</CardDescription>
+                <CardHeader className="space-y-2">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <CardTitle className="text-lg">Your Content</CardTitle>
+                      <CardDescription>Platform-optimized versions ready to post</CardDescription>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleGenerateAnother}
+                      disabled={isProcessing}
+                      className="gap-2"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      Generate Another
+                    </Button>
+                  </div>
+                  {outputVariants.length > 1 && (
+                    <p className="text-xs text-muted-foreground">
+                      Compare options side by side and pick your favorite per platform.
+                    </p>
+                  )}
                 </CardHeader>
                 <CardContent>
-                  <Tabs defaultValue={outputs[0]?.platform.toLowerCase()} className="w-full">
+                  <Tabs defaultValue={platformTabs[0]?.platform.toLowerCase()} className="w-full">
                     <TabsList className="w-full flex-wrap h-auto gap-1 bg-muted/50 p-1">
-                      {getFilteredOutputs().map((output) => {
+                      {platformTabs.map((platform) => {
                         const platformConfig = PLATFORM_CONFIG.find(
-                          p => output.platform.toLowerCase().includes(p.id) || p.id.includes(output.platform.toLowerCase())
+                          p => platform.platform.toLowerCase().includes(p.id) || p.id.includes(platform.platform.toLowerCase())
                         );
                         return (
                           <TabsTrigger
-                            key={output.platform}
-                            value={output.platform.toLowerCase()}
+                            key={platform.platform}
+                            value={platform.platform.toLowerCase()}
                             className="flex-1 min-w-[80px] data-[state=active]:bg-background gap-1"
                           >
                             <span>{platformConfig?.icon || "📝"}</span>
-                            <span className="hidden sm:inline">{platformConfig?.label || output.platform}</span>
+                            <span className="hidden sm:inline">{platformConfig?.label || platform.platform}</span>
                           </TabsTrigger>
                         );
                       })}
                     </TabsList>
-                    
-                    {getFilteredOutputs().map((output) => (
-                      <TabsContent key={output.platform} value={output.platform.toLowerCase()} className="mt-4">
-                        <motion.div
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="space-y-4"
-                        >
-                          <div className="bg-muted/50 rounded-lg p-4 text-sm whitespace-pre-wrap font-mono leading-relaxed">
-                            {output.content}
+
+                    {platformTabs.map((platform) => {
+                      const platformKey = platform.platform.toLowerCase();
+                      return (
+                        <TabsContent key={platform.platform} value={platformKey} className="mt-4">
+                          <div className="grid gap-4 md:grid-cols-2">
+                            {outputVariants.map((variant) => {
+                              const variantOutput = getFilteredOutputs(variant.outputs).find(
+                                (output) => output.platform.toLowerCase() === platformKey
+                              );
+                              if (!variantOutput) return null;
+
+                              const isSelected = selectedVariantByPlatform[platformKey] === variant.id;
+                              const copyKey = `${platformKey}:${variant.id}`;
+
+                              return (
+                                <motion.div
+                                  key={variant.id}
+                                  initial={{ opacity: 0, y: 10 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  className={`space-y-3 rounded-lg border p-4 ${isSelected ? "border-primary/60 bg-primary/5" : "border-muted"}`}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm font-medium">{variant.label}</span>
+                                      {isSelected && <Badge variant="default">Selected</Badge>}
+                                    </div>
+                                    <Button
+                                      variant={isSelected ? "default" : "outline"}
+                                      size="sm"
+                                      onClick={() =>
+                                        setSelectedVariantByPlatform((prev) => ({
+                                          ...prev,
+                                          [platformKey]: variant.id,
+                                        }))
+                                      }
+                                    >
+                                      {isSelected ? "Using" : "Use this"}
+                                    </Button>
+                                  </div>
+                                  <div className="bg-muted/50 rounded-lg p-4 text-sm whitespace-pre-wrap font-mono leading-relaxed">
+                                    {variantOutput.content}
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm text-muted-foreground">
+                                      {variantOutput.content.length} characters
+                                    </span>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleCopy(copyKey, variantOutput.content, platform.platform)}
+                                    >
+                                      {copiedPlatform === copyKey ? (
+                                        <>
+                                          <Check className="h-4 w-4 mr-2" />
+                                          Copied!
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Copy className="h-4 w-4 mr-2" />
+                                          Copy
+                                        </>
+                                      )}
+                                    </Button>
+                                  </div>
+                                </motion.div>
+                              );
+                            })}
                           </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm text-muted-foreground">
-                              {output.content.length} characters
-                            </span>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleCopy(output.platform, output.content)}
-                            >
-                              {copiedPlatform === output.platform ? (
-                                <>
-                                  <Check className="h-4 w-4 mr-2" />
-                                  Copied!
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="h-4 w-4 mr-2" />
-                                  Copy
-                                </>
-                              )}
-                            </Button>
-                          </div>
-                        </motion.div>
-                      </TabsContent>
-                    ))}
+                        </TabsContent>
+                      );
+                    })}
                   </Tabs>
                 </CardContent>
               </Card>
@@ -986,15 +1095,21 @@ const GeneratePage = () => {
                 </Card>
               )}
 
-              <div className="flex justify-between mt-6">
+              <div className="flex flex-col sm:flex-row sm:justify-between gap-3 mt-6">
                 <Button variant="outline" onClick={() => setCurrentStep(3)}>
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Back
                 </Button>
-                <Button variant="hero" size="lg" onClick={resetFlow}>
-                  <Sparkles className="h-5 w-5 mr-2" />
-                  Create More
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button variant="outline" onClick={handleGenerateAnother} disabled={isProcessing}>
+                    <Sparkles className="h-5 w-5 mr-2" />
+                    Generate Another
+                  </Button>
+                  <Button variant="hero" size="lg" onClick={resetFlow}>
+                    <Sparkles className="h-5 w-5 mr-2" />
+                    Create More
+                  </Button>
+                </div>
               </div>
             </motion.div>
           )}
