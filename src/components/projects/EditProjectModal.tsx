@@ -1,10 +1,8 @@
 import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
+import { Loader2, Pencil, X, Check } from "lucide-react";
 import type { Project } from "@/hooks/useProjects";
 
 interface EditProjectModalProps {
@@ -31,12 +29,12 @@ interface EditProjectModalProps {
 }
 
 const goalOptions = [
-  { value: "educate", label: "Educate & Inform" },
-  { value: "grow_audience", label: "Grow Audience" },
-  { value: "sell_product", label: "Sell Product/Service" },
-  { value: "build_brand", label: "Build Personal Brand" },
-  { value: "share_story", label: "Share Stories & Experiences" },
-  { value: "entertain", label: "Entertain" },
+  { value: "educate", label: "Educate & Inform", emoji: "📚" },
+  { value: "grow_audience", label: "Grow Audience", emoji: "📈" },
+  { value: "sell_product", label: "Sell Product/Service", emoji: "💼" },
+  { value: "build_brand", label: "Build Personal Brand", emoji: "⭐" },
+  { value: "share_story", label: "Share Stories & Experiences", emoji: "📖" },
+  { value: "entertain", label: "Entertain", emoji: "🎭" },
 ];
 
 const EditProjectModal = ({
@@ -77,67 +75,148 @@ const EditProjectModal = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Edit Project</DialogTitle>
-          <DialogDescription>
-            Update your project details.
-          </DialogDescription>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-          <div className="space-y-2">
-            <Label htmlFor="edit-title">Project Name *</Label>
-            <Input
-              id="edit-title"
-              placeholder="e.g., SaaS Marketing Series"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="edit-description">Description</Label>
-            <Textarea
-              id="edit-description"
-              placeholder="What is this project about?"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="edit-goal">Goal</Label>
-            <Select value={goal} onValueChange={setGoal}>
-              <SelectTrigger>
-                <SelectValue placeholder="What's the purpose of this project?" />
-              </SelectTrigger>
-              <SelectContent>
-                {goalOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={loading}
+      <DialogContent className="sm:max-w-md p-0 overflow-hidden border-0 shadow-2xl">
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="relative"
             >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={!title.trim() || loading}>
-              {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Save Changes
-            </Button>
-          </div>
-        </form>
+              {/* Decorative background */}
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 pointer-events-none" />
+
+              {/* Close button */}
+              <motion.button
+                whileHover={{ scale: 1.1, rotate: 90 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => onOpenChange(false)}
+                className="absolute right-4 top-4 p-2 rounded-full hover:bg-muted transition-colors z-10"
+              >
+                <X className="h-4 w-4 text-muted-foreground" />
+              </motion.button>
+
+              <div className="relative p-6">
+                {/* Header */}
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="flex items-center gap-3 mb-6"
+                >
+                  <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary to-accent">
+                    <Pencil className="h-5 w-5 text-primary-foreground" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-foreground">Edit Project</h2>
+                    <p className="text-sm text-muted-foreground">
+                      Update your project details
+                    </p>
+                  </div>
+                </motion.div>
+
+                {/* Form */}
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.15 }}
+                    className="space-y-2"
+                  >
+                    <Label htmlFor="edit-title" className="text-sm font-medium">
+                      Project Name <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="edit-title"
+                      placeholder="e.g., SaaS Marketing Series"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      className="border-muted-foreground/20 focus-visible:ring-primary/30"
+                    />
+                  </motion.div>
+
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className="space-y-2"
+                  >
+                    <Label htmlFor="edit-description" className="text-sm font-medium">
+                      Description
+                    </Label>
+                    <Textarea
+                      id="edit-description"
+                      placeholder="What is this project about?"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      rows={3}
+                      className="border-muted-foreground/20 focus-visible:ring-primary/30 resize-none"
+                    />
+                  </motion.div>
+
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.25 }}
+                    className="space-y-2"
+                  >
+                    <Label htmlFor="edit-goal" className="text-sm font-medium">
+                      Goal
+                    </Label>
+                    <Select value={goal} onValueChange={setGoal}>
+                      <SelectTrigger className="border-muted-foreground/20 focus:ring-primary/30">
+                        <SelectValue placeholder="What's the purpose?" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {goalOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            <span className="flex items-center gap-2">
+                              <span>{option.emoji}</span>
+                              <span>{option.label}</span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </motion.div>
+
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                    className="flex justify-end gap-3 pt-4"
+                  >
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => onOpenChange(false)}
+                      disabled={loading}
+                    >
+                      Cancel
+                    </Button>
+                    <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                      <Button
+                        type="submit"
+                        variant="hero"
+                        disabled={!title.trim() || loading}
+                        className="gap-2"
+                      >
+                        {loading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Check className="h-4 w-4" />
+                        )}
+                        Save Changes
+                      </Button>
+                    </motion.div>
+                  </motion.div>
+                </form>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </DialogContent>
     </Dialog>
   );
