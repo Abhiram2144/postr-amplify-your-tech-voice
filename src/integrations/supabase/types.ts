@@ -22,7 +22,7 @@ export type Database = {
           content_type: string | null
           created_at: string | null
           generation_id: string
-          generation_source: string
+          generation_source: Database["public"]["Enums"]["generation_source_type"]
           id: string
           improved_content: string | null
           input_type: string | null
@@ -41,7 +41,7 @@ export type Database = {
           content_type?: string | null
           created_at?: string | null
           generation_id?: string
-          generation_source?: string
+          generation_source?: Database["public"]["Enums"]["generation_source_type"]
           id?: string
           improved_content?: string | null
           input_type?: string | null
@@ -60,7 +60,7 @@ export type Database = {
           content_type?: string | null
           created_at?: string | null
           generation_id?: string
-          generation_source?: string
+          generation_source?: Database["public"]["Enums"]["generation_source_type"]
           id?: string
           improved_content?: string | null
           input_type?: string | null
@@ -109,17 +109,17 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "project_notes_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "project_notes_content_output_id_fkey"
             columns: ["content_output_id"]
             isOneToOne: false
             referencedRelation: "content_outputs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_notes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -342,9 +342,11 @@ export type Database = {
         }
         Returns: boolean
       }
+      reset_monthly_usage: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role: "user" | "admin"
+      generation_source_type: "ai" | "mock" | "video_transcript"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -473,6 +475,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["user", "admin"],
+      generation_source_type: ["ai", "mock", "video_transcript"],
     },
   },
 } as const

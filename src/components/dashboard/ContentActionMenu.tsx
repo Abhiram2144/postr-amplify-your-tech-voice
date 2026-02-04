@@ -13,7 +13,7 @@ import { motion } from "framer-motion";
 interface ContentActionMenuProps {
   onView: () => void;
   onCopy: () => void;
-  onDelete: () => void;
+  onDelete?: () => void;
   isCopied?: boolean;
 }
 
@@ -76,19 +76,22 @@ export const ContentActionMenu = ({
           )}
         </DropdownMenuItem>
 
-        <DropdownMenuSeparator />
-
-        <DropdownMenuItem
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-            setIsOpen(false);
-          }}
-          className="cursor-pointer text-destructive focus:text-destructive"
-        >
-          <Trash2 className="mr-2 h-4 w-4" />
-          <span>Delete</span>
-        </DropdownMenuItem>
+        {onDelete && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+                setIsOpen(false);
+              }}
+              className="cursor-pointer text-destructive focus:text-destructive"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              <span>Delete</span>
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
