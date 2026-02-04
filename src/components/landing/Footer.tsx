@@ -74,13 +74,12 @@ const Footer = () => {
               <span className="text-xl font-bold text-foreground">Postr</span>
             </Link>
             <p className="mt-4 max-w-xs text-sm text-muted-foreground">
-              Transform your ideas into engaging content for LinkedIn, X, Threads, Reddit, Instagram, Tiktok and
-              Youtube.
+              Transform your tech ideas into engaging content for LinkedIn, X, Threads, and Reddit.
             </p>
 
             {/* About Creator Link */}
             <motion.a
-              href="#"
+              href="http://instagram.com/abhhicooks"
               initial={{ opacity: 0, y: 10 }}
               animate={isInView ? { opacity: 1, y: 0 } : {}}
               transition={{ delay: 0.3 }}
