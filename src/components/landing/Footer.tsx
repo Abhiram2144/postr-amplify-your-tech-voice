@@ -28,7 +28,7 @@ const Footer = () => {
 
   const renderLink = (link: { label: string; href: string; isRoute: boolean }, index: number) => {
     const className = "text-sm text-muted-foreground transition-colors hover:text-primary";
-    
+
     if (link.isRoute) {
       return (
         <motion.div
@@ -74,8 +74,7 @@ const Footer = () => {
               <span className="text-xl font-bold text-foreground">Postr</span>
             </Link>
             <p className="mt-4 max-w-xs text-sm text-muted-foreground">
-              Transform your tech ideas into engaging content for LinkedIn, X, Threads,
-              and Reddit.
+              Transform your tech ideas into engaging content for LinkedIn, X, Threads, and Reddit.
             </p>
 
             {/* About Creator Link */}
@@ -87,32 +86,26 @@ const Footer = () => {
               className="mt-6 inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-primary"
             >
               <User className="h-4 w-4" />
-              About me, creator of Postr
+              AR, creator of Postr
             </motion.a>
           </motion.div>
 
           {/* Product Links */}
           <div>
             <h4 className="text-sm font-semibold text-foreground">Product</h4>
-            <div className="mt-4 flex flex-col gap-3">
-              {productLinks.map((link, index) => renderLink(link, index))}
-            </div>
+            <div className="mt-4 flex flex-col gap-3">{productLinks.map((link, index) => renderLink(link, index))}</div>
           </div>
 
           {/* Company Links */}
           <div>
             <h4 className="text-sm font-semibold text-foreground">Company</h4>
-            <div className="mt-4 flex flex-col gap-3">
-              {companyLinks.map((link, index) => renderLink(link, index))}
-            </div>
+            <div className="mt-4 flex flex-col gap-3">{companyLinks.map((link, index) => renderLink(link, index))}</div>
           </div>
 
           {/* Legal Links */}
           <div>
             <h4 className="text-sm font-semibold text-foreground">Legal</h4>
-            <div className="mt-4 flex flex-col gap-3">
-              {legalLinks.map((link, index) => renderLink(link, index))}
-            </div>
+            <div className="mt-4 flex flex-col gap-3">{legalLinks.map((link, index) => renderLink(link, index))}</div>
           </div>
         </div>
 
@@ -123,12 +116,8 @@ const Footer = () => {
           transition={{ delay: 0.5 }}
           className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-border pt-8 sm:flex-row"
         >
-          <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} Postr. All rights reserved.
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Built for tech creators, by tech creators.
-          </p>
+          <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} Postr. All rights reserved.</p>
+          <p className="text-sm text-muted-foreground">Built for tech creators, by tech creators.</p>
         </motion.div>
       </div>
     </footer>
