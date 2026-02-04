@@ -25,6 +25,7 @@ import {
   Zap,
   Lock,
   AlertCircle,
+  Plus,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -229,6 +230,8 @@ const GeneratePage = () => {
   const [outputs, setOutputs] = useState<PlatformOutput[]>([]);
   const [outputVariants, setOutputVariants] = useState<OutputVariant[]>([]);
   const [selectedVariantByPlatform, setSelectedVariantByPlatform] = useState<Record<string, string>>({});
+  const [hasGeneratedAnother, setHasGeneratedAnother] = useState(false);
+  const [variantsSaved, setVariantsSaved] = useState(false);
 
   useEffect(() => {
     // Prefill topic from URL (e.g. converting a note -> generate)
@@ -338,34 +341,16 @@ const GeneratePage = () => {
       setIsProcessing(true);
       setTimeout(() => {
         addOutputVariant({ analysis: MOCK_VIDEO_ANALYSIS.analysis, outputs: MOCK_VIDEO_ANALYSIS.outputs }, append);
-        persistOutputs(selectedProjectId, { analysis: MOCK_VIDEO_ANALYSIS.analysis, outputs: MOCK_VIDEO_ANALYSIS.outputs }, testingMode || creationMode === "video" ? "mock" : "ai")
-          .then(() => {
-            if (selectedProjectId) {
-              toast({
-                title: append ? "Another version generated" : "Saved to project",
-                description: selectedProjectLabel ? `Saved under "${selectedProjectLabel}".` : "Saved under your selected project.",
-              });
-            } else {
-              toast({
-                title: append ? "Another version generated" : "Generated",
-                description: "Not saved — link a project to save this output.",
-              });
-            }
-          })
-          .catch((e) => {
-            console.error("Failed to save outputs:", e);
-            if (selectedProjectId) {
-              toast({
-                title: "Generated, but not saved",
-                description: "Could not save this output to your project.",
-                variant: "destructive",
-              });
-            }
-          });
-        setIsProcessing(false);
         if (!append) {
           setCurrentStep(2);
+        } else {
+          setHasGeneratedAnother(true);
+          toast({
+            title: "Another version generated",
+            description: "Select your preferred version per platform, then save.",
+          });
         }
+        setIsProcessing(false);
       }, 1500);
       return;
     }
@@ -402,21 +387,26 @@ const GeneratePage = () => {
         };
       })();
 
-      // Persist generated outputs to the selected project (mark as 'ai' source, or 'mock' if testing)
-      await persistOutputs(selectedProjectId, { analysis: generated.analysis, outputs: generated.outputs }, testingMode ? "mock" : "ai");
+      // Don't auto-persist - user will click "Save to Project" button
+      // Just add to output variants for comparison
+      addOutputVariant({ analysis: generated.analysis, outputs: generated.outputs }, append);
       
       // Update credits in hook (only if not in testing mode)
       if (!testingMode && generated.credits?.used !== undefined) {
         updateCreditsAfterGeneration(generated.credits.used);
       }
       
+      if (append) {
+        setHasGeneratedAnother(true);
+      }
+      
       setCurrentStep(append ? 4 : 2);
       
       toast({
         title: append ? "Another version generated" : "Content Generated!",
-        description: selectedProjectId
-          ? `Saved under "${selectedProjectLabel || "your project"}". ${testingMode ? "[Testing Mode - No Credits Used]" : `${generated.credits?.remaining ?? creditsRemaining - 1} credits remaining.`}`
-          : `Generated (not saved). ${testingMode ? "[Testing Mode - No Credits Used]" : `${generated.credits?.remaining ?? creditsRemaining - 1} credits remaining.`}`,
+        description: append
+          ? "Select your preferred version per platform, then save."
+          : `Ready to review. ${testingMode ? "[Testing Mode - No Credits Used]" : `${generated.credits?.remaining ?? creditsRemaining - 1} credits remaining.`}`,
       });
     } catch (error) {
       console.error("Generation error:", error);
@@ -435,13 +425,73 @@ const GeneratePage = () => {
     }
   };
 
+  const handleSaveSelectedToProject = async () => {
+    if (!selectedProjectId) {
+      toast({
+        title: "No Project Selected",
+        description: "Please select a project to save your content.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (Object.keys(selectedVariantByPlatform).length === 0) {
+      toast({
+        title: "No Selection",
+        description: "Please select at least one variant per platform.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      // Get only the selected variants
+      const selectedVariants = Object.values(selectedVariantByPlatform);
+      const uniqueVariantIds = Array.from(new Set(selectedVariants));
+
+      // Find the variant that appears in selectedVariantByPlatform
+      // We need to persist only the selected variant outputs
+      for (const variantId of uniqueVariantIds) {
+        const variant = outputVariants.find((v) => v.id === variantId);
+        if (variant) {
+          await persistOutputs(selectedProjectId, { analysis: variant.analysis, outputs: variant.outputs }, testingMode ? "mock" : "ai");
+        }
+      }
+
+      setVariantsSaved(true);
+      toast({
+        title: "Saved to Project",
+        description: `Saved ${uniqueVariantIds.length} variant(s) under "${selectedProjectLabel || "your project"}".`,
+      });
+
+      // Reset flow after successful save
+      setTimeout(() => {
+        resetFlow();
+      }, 1500);
+    } catch (error) {
+      console.error("Failed to save variants:", error);
+      toast({
+        title: "Save Failed",
+        description: error instanceof Error ? error.message : "Could not save your selections.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const resetFlow = () => {
     setCurrentStep(1);
     setAnalysis(null);
     setOutputs([]);
     setOutputVariants([]);
     setSelectedVariantByPlatform({});
+    setHasGeneratedAnother(false);
+    setVariantsSaved(false);
   };
+
 
   const getFilteredOutputs = (variantOutputs: PlatformOutput[]) => {
     return variantOutputs.filter(o => 
@@ -978,16 +1028,18 @@ const GeneratePage = () => {
                       <CardTitle className="text-lg">Your Content</CardTitle>
                       <CardDescription>Platform-optimized versions ready to post</CardDescription>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleGenerateAnother}
-                      disabled={isProcessing}
-                      className="gap-2"
-                    >
-                      <Sparkles className="h-4 w-4" />
-                      Generate Another
-                    </Button>
+                    {!hasGeneratedAnother && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleGenerateAnother}
+                        disabled={isProcessing}
+                        className="gap-2"
+                      >
+                        <Sparkles className="h-4 w-4" />
+                        Generate Another
+                      </Button>
+                    )}
                   </div>
                   {outputVariants.length > 1 && (
                     <p className="text-xs text-muted-foreground">
@@ -1111,15 +1163,33 @@ const GeneratePage = () => {
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Back
                 </Button>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <Button variant="outline" onClick={handleGenerateAnother} disabled={isProcessing}>
-                    <Sparkles className="h-5 w-5 mr-2" />
-                    Generate Another
-                  </Button>
-                  <Button variant="hero" size="lg" onClick={resetFlow}>
-                    <Sparkles className="h-5 w-5 mr-2" />
-                    Create More
-                  </Button>
+                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                  {!variantsSaved && (
+                    <>
+                      {selectedProjectId && (
+                        <Button
+                          variant="hero"
+                          size="lg"
+                          onClick={handleSaveSelectedToProject}
+                          disabled={isProcessing || Object.keys(selectedVariantByPlatform).length === 0}
+                          className="gap-2"
+                        >
+                          <Check className="h-5 w-5" />
+                          Save to Project
+                        </Button>
+                      )}
+                      <Button variant="outline" onClick={resetFlow}>
+                        <Sparkles className="h-5 w-5 mr-2" />
+                        Create More
+                      </Button>
+                    </>
+                  )}
+                  {variantsSaved && (
+                    <Button variant="outline" onClick={resetFlow}>
+                      <Plus className="h-5 w-5 mr-2" />
+                      Create New
+                    </Button>
+                  )}
                 </div>
               </div>
             </motion.div>
