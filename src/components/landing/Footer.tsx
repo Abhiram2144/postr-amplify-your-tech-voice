@@ -79,14 +79,14 @@ const Footer = () => {
 
             {/* About Creator Link */}
             <motion.a
-              href="http://instagram.com/abhhicooks"
+              href="#"
               initial={{ opacity: 0, y: 10 }}
               animate={isInView ? { opacity: 1, y: 0 } : {}}
               transition={{ delay: 0.3 }}
               className="mt-6 inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-primary"
             >
               <User className="h-4 w-4" />
-              About me, creator of Postr
+              AR, creator of Postr
             </motion.a>
           </motion.div>
 
