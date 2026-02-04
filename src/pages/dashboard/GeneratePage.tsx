@@ -204,6 +204,8 @@ const GeneratePage = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [copiedPlatform, setCopiedPlatform] = useState<string | null>(null);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
+  const [testingMode, setTestingMode] = useState(true); // Enable testing mode by default
+
 
   // Project selection (required to persist content because of RLS)
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(initialProjectId);
@@ -325,18 +327,18 @@ const GeneratePage = () => {
   };
 
   const handleGenerate = async (append = false) => {
-    // Check credits for text generation
-    if (creationMode !== "video" && creditsRemaining <= 0) {
+    // Check credits for text generation (skip if testing mode enabled)
+    if (!testingMode && creationMode !== "video" && creditsRemaining <= 0) {
       setShowCreditsModal(true);
       return;
     }
 
-    // Video mode uses mock data
-    if (creationMode === "video") {
+    // Testing mode or video mode uses mock data
+    if (testingMode || creationMode === "video") {
       setIsProcessing(true);
       setTimeout(() => {
         addOutputVariant({ analysis: MOCK_VIDEO_ANALYSIS.analysis, outputs: MOCK_VIDEO_ANALYSIS.outputs }, append);
-        persistOutputs(selectedProjectId, { analysis: MOCK_VIDEO_ANALYSIS.analysis, outputs: MOCK_VIDEO_ANALYSIS.outputs }, "mock")
+        persistOutputs(selectedProjectId, { analysis: MOCK_VIDEO_ANALYSIS.analysis, outputs: MOCK_VIDEO_ANALYSIS.outputs }, testingMode || creationMode === "video" ? "mock" : "ai")
           .then(() => {
             if (selectedProjectId) {
               toast({
@@ -400,13 +402,11 @@ const GeneratePage = () => {
         };
       })();
 
-      addOutputVariant({ analysis: generated.analysis, outputs: generated.outputs }, append);
-
-      // Persist generated outputs to the selected project (mark as 'ai' source)
-      await persistOutputs(selectedProjectId, { analysis: generated.analysis, outputs: generated.outputs }, "ai");
+      // Persist generated outputs to the selected project (mark as 'ai' source, or 'mock' if testing)
+      await persistOutputs(selectedProjectId, { analysis: generated.analysis, outputs: generated.outputs }, testingMode ? "mock" : "ai");
       
-      // Update credits in hook
-      if (generated.credits?.used !== undefined) {
+      // Update credits in hook (only if not in testing mode)
+      if (!testingMode && generated.credits?.used !== undefined) {
         updateCreditsAfterGeneration(generated.credits.used);
       }
       
@@ -415,8 +415,8 @@ const GeneratePage = () => {
       toast({
         title: append ? "Another version generated" : "Content Generated!",
         description: selectedProjectId
-          ? `Saved under "${selectedProjectLabel || "your project"}". ${generated.credits?.remaining ?? creditsRemaining - 1} credits remaining.`
-          : `Generated (not saved). ${generated.credits?.remaining ?? creditsRemaining - 1} credits remaining.`,
+          ? `Saved under "${selectedProjectLabel || "your project"}". ${testingMode ? "[Testing Mode - No Credits Used]" : `${generated.credits?.remaining ?? creditsRemaining - 1} credits remaining.`}`
+          : `Generated (not saved). ${testingMode ? "[Testing Mode - No Credits Used]" : `${generated.credits?.remaining ?? creditsRemaining - 1} credits remaining.`}`,
       });
     } catch (error) {
       console.error("Generation error:", error);
@@ -507,12 +507,27 @@ const GeneratePage = () => {
             <h1 className="text-2xl lg:text-3xl font-bold text-foreground">Create Content</h1>
             <p className="text-muted-foreground mt-1">Transform your ideas into platform-ready posts</p>
           </div>
-          <CreditsIndicator
-            label={creationMode === "video" ? "Video credits" : "Text credits"}
-            used={creationMode === "video" ? videoCreditsUsed : undefined}
-            limit={creationMode === "video" ? videoCreditsLimit : undefined}
-            remaining={creationMode === "video" ? videoCreditsRemaining : undefined}
-          />
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+            {testingMode && (
+              <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                Testing Mode
+              </Badge>
+            )}
+            <CreditsIndicator
+              label={creationMode === "video" ? "Video credits" : "Text credits"}
+              used={creationMode === "video" ? videoCreditsUsed : undefined}
+              limit={creationMode === "video" ? videoCreditsLimit : undefined}
+              remaining={creationMode === "video" ? videoCreditsRemaining : undefined}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setTestingMode(!testingMode)}
+              title={testingMode ? "Switch to real credits" : "Switch to testing mode"}
+            >
+              {testingMode ? "Disable Testing" : "Enable Testing"}
+            </Button>
+          </div>
         </div>
 
         {/* Progress Steps */}
@@ -699,21 +714,17 @@ const GeneratePage = () => {
 
                   {creationMode === "video" && (
                     <div className="space-y-4">
-                      <div className="border-2 border-dashed border-muted rounded-xl p-8 text-center relative">
-                        <div className="absolute inset-0 bg-muted/30 rounded-xl flex items-center justify-center">
-                          <div className="text-center space-y-2">
-                            <Lock className="h-8 w-8 mx-auto text-muted-foreground" />
-                            <p className="text-sm text-muted-foreground font-medium">Video upload coming soon</p>
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-center gap-4 opacity-50">
-                          <div className="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center">
+                      <div className="border-2 border-dashed border-muted-foreground/30 rounded-xl p-12 text-center bg-muted/20 relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-muted/40 to-transparent flex items-center justify-center z-0" />
+                        <div className="relative z-10 flex flex-col items-center gap-4">
+                          <div className="h-16 w-16 rounded-2xl bg-background border border-muted flex items-center justify-center">
                             <Video className="h-8 w-8 text-muted-foreground" />
                           </div>
                           <div>
                             <p className="font-medium text-foreground">Drop your video here</p>
                             <p className="text-sm text-muted-foreground">or click to browse</p>
                           </div>
+                          <Lock className="h-5 w-5 text-muted-foreground absolute top-4 right-4" />
                         </div>
                       </div>
                       
