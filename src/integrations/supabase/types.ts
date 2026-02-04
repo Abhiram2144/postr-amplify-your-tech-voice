@@ -16,28 +16,49 @@ export type Database = {
     Tables: {
       content_outputs: {
         Row: {
+          analysis_feedback: Json | null
+          analysis_score: number | null
           content: string | null
           content_type: string | null
           created_at: string | null
           id: string
+          improved_content: string | null
+          input_type: string | null
+          original_input: string | null
           platform: string | null
           project_id: string | null
+          rewrite_count: number | null
+          updated_at: string | null
         }
         Insert: {
+          analysis_feedback?: Json | null
+          analysis_score?: number | null
           content?: string | null
           content_type?: string | null
           created_at?: string | null
           id?: string
+          improved_content?: string | null
+          input_type?: string | null
+          original_input?: string | null
           platform?: string | null
           project_id?: string | null
+          rewrite_count?: number | null
+          updated_at?: string | null
         }
         Update: {
+          analysis_feedback?: Json | null
+          analysis_score?: number | null
           content?: string | null
           content_type?: string | null
           created_at?: string | null
           id?: string
+          improved_content?: string | null
+          input_type?: string | null
+          original_input?: string | null
           platform?: string | null
           project_id?: string | null
+          rewrite_count?: number | null
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -49,29 +70,76 @@ export type Database = {
           },
         ]
       }
-      projects: {
+      project_notes: {
         Row: {
           created_at: string | null
           id: string
-          input_type: string | null
-          status: string | null
-          title: string | null
-          user_id: string | null
+          project_id: string
+          text: string
+          updated_at: string | null
         }
         Insert: {
           created_at?: string | null
           id?: string
-          input_type?: string | null
-          status?: string | null
-          title?: string | null
-          user_id?: string | null
+          project_id: string
+          text: string
+          updated_at?: string | null
         }
         Update: {
           created_at?: string | null
           id?: string
+          project_id?: string
+          text?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_notes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          archived: boolean | null
+          created_at: string | null
+          description: string | null
+          goal: string | null
+          id: string
+          input_type: string | null
+          platforms: string[] | null
+          status: string | null
+          title: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          archived?: boolean | null
+          created_at?: string | null
+          description?: string | null
+          goal?: string | null
+          id?: string
           input_type?: string | null
+          platforms?: string[] | null
           status?: string | null
           title?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          archived?: boolean | null
+          created_at?: string | null
+          description?: string | null
+          goal?: string | null
+          id?: string
+          input_type?: string | null
+          platforms?: string[] | null
+          status?: string | null
+          title?: string | null
+          updated_at?: string | null
           user_id?: string | null
         }
         Relationships: [
