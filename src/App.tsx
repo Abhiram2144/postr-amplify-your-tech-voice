@@ -23,6 +23,7 @@ import DashboardLayout from "./components/dashboard/DashboardLayout";
 import DashboardOverview from "./pages/dashboard/DashboardOverview";
 import GeneratePage from "./pages/dashboard/GeneratePage";
 import ProjectsPage from "./pages/dashboard/ProjectsPage";
+import ProjectDetailPage from "./pages/dashboard/ProjectDetailPage";
 import HistoryPage from "./pages/dashboard/HistoryPage";
 import UsagePage from "./pages/dashboard/UsagePage";
 import SettingsPage from "./pages/dashboard/SettingsPage";
@@ -63,6 +64,7 @@ const App = () => (
                   <Route index element={<DashboardOverview />} />
                   <Route path="generate" element={<GeneratePage />} />
                   <Route path="projects" element={<ProjectsPage />} />
+                  <Route path="projects/:projectId" element={<ProjectDetailPage />} />
                   <Route path="history" element={<HistoryPage />} />
                   <Route path="usage" element={<UsagePage />} />
                   <Route path="settings" element={<SettingsPage />} />
