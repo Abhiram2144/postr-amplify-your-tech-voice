@@ -1,10 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { getCorsHeaders, handleCorsOptions } from "../_shared/cors.ts";
 
 /**
  * Scheduled function to reset monthly usage
@@ -19,12 +15,16 @@ const corsHeaders = {
  * - Rate limiting: only one reset allowed per month
  * - Audit logging for all reset attempts
  * - Idempotent: safe to run multiple times in same month (will be rejected)
+ * - Restricted CORS to approved domains only
  */
 
 serve(async (req) => {
-  // Handle CORS
+  const origin = req.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin);
+
+  // Handle CORS preflight
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return handleCorsOptions(origin);
   }
 
   // Create Supabase client with service role key (bypasses RLS)
