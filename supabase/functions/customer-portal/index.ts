@@ -2,9 +2,25 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+// CORS configuration with origin restrictions
+const ALLOWED_ORIGINS = [
+  "https://postr-genius.lovable.app",
+  "https://id-preview--4a84c60f-1875-4a85-aaf4-0085811561d6.lovable.app",
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "http://localhost:8080",
+];
+
+const getCorsHeaders = (origin: string | null) => {
+  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin)
+    ? origin
+    : ALLOWED_ORIGINS[0];
+
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+    "Access-Control-Allow-Credentials": "true",
+  };
 };
 
 const logStep = (step: string, details?: Record<string, unknown>) => {
@@ -50,6 +66,9 @@ const getSafeErrorMessage = (error: unknown): string => {
 };
 
 serve(async (req) => {
+  const origin = req.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin);
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -84,10 +103,14 @@ serve(async (req) => {
     const customerId = customers.data[0].id;
     logStep("Found Stripe customer");
 
-    const origin = req.headers.get("origin") || "https://postr-genius.lovable.app";
+    // Use validated origin or fallback
+    const returnOrigin = origin && ALLOWED_ORIGINS.includes(origin) 
+      ? origin 
+      : ALLOWED_ORIGINS[0];
+      
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: customerId,
-      return_url: `${origin}/dashboard/settings`,
+      return_url: `${returnOrigin}/dashboard/settings`,
     });
     logStep("Customer portal session created");
 
