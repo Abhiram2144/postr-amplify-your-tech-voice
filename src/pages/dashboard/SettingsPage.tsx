@@ -109,7 +109,7 @@ const MyPlanTabContent = ({ profile }: { profile: UserProfile | null }) => {
       name: STRIPE_PLANS.free.name,
       price: "$0",
       period: "/month",
-      features: ["5 ideas per month", "2 videos per month", "3 platforms"],
+      features: ["10 ideas per month", "2 videos per month", "2 projects", "3 platforms"],
       priceId: null,
     },
     {
@@ -117,7 +117,7 @@ const MyPlanTabContent = ({ profile }: { profile: UserProfile | null }) => {
       name: STRIPE_PLANS.creator.name,
       price: "$14",
       period: "/month",
-      features: ["100 ideas per month", "20 videos per month", "All platforms"],
+      features: ["60 ideas per month", "20 videos per month", "10 projects", "All platforms"],
       priceId: STRIPE_PLANS.creator.monthly.priceId,
       popular: true,
     },
@@ -126,7 +126,7 @@ const MyPlanTabContent = ({ profile }: { profile: UserProfile | null }) => {
       name: STRIPE_PLANS.pro.name,
       price: "$29",
       period: "/month",
-      features: ["Unlimited ideas", "Unlimited videos", "Priority processing"],
+      features: ["150 ideas per month", "Unlimited videos", "50 projects", "Priority processing"],
       priceId: STRIPE_PLANS.pro.monthly.priceId,
     },
   ];

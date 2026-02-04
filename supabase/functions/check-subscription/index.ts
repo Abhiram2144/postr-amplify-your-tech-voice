@@ -145,9 +145,9 @@ serve(async (req) => {
 
       // Update user record with subscription info (non-sensitive data only)
       const limits = plan === "pro" 
-        ? { monthly_generation_limit: 999, monthly_video_limit: 999 }
+        ? { monthly_generation_limit: 150, monthly_video_limit: 999 }
         : plan === "creator"
-        ? { monthly_generation_limit: 100, monthly_video_limit: 20 }
+        ? { monthly_generation_limit: 60, monthly_video_limit: 20 }
         : { monthly_generation_limit: 10, monthly_video_limit: 2 };
 
       await supabaseClient

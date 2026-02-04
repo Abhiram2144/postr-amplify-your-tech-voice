@@ -90,7 +90,7 @@ const BeautifulContentModal = ({ open, onOpenChange, generation, notes }: Beauti
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden border-0 shadow-2xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0 border-0 shadow-2xl overflow-y-auto">
         <AnimatePresence>
           {open && (
             <motion.div
@@ -98,10 +98,10 @@ const BeautifulContentModal = ({ open, onOpenChange, generation, notes }: Beauti
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
               transition={{ duration: 0.2, ease: "easeOut" }}
-              className="flex flex-col h-full"
+              className="flex flex-col"
             >
               {/* Header with platform tabs */}
-              <div className="border-b bg-gradient-to-r from-muted/50 to-transparent p-6">
+              <div className="border-b bg-gradient-to-r from-muted/50 to-transparent p-6 flex-shrink-0">
                 <div className="flex items-start justify-between mb-5">
                   <div className="space-y-1 flex-1">
                     <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">
@@ -111,14 +111,6 @@ const BeautifulContentModal = ({ open, onOpenChange, generation, notes }: Beauti
                       {generation.created_at ? format(new Date(generation.created_at), "MMMM d, yyyy 'at' h:mm a") : ""}
                     </p>
                   </div>
-                  <motion.button
-                    whileHover={{ scale: 1.1, rotate: 90 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => onOpenChange(false)}
-                    className="p-2 rounded-full hover:bg-muted transition-all ml-4 flex-shrink-0"
-                  >
-                    <X className="h-5 w-5 text-muted-foreground" />
-                  </motion.button>
                 </div>
 
                 {/* Platform selection tabs */}
@@ -149,7 +141,7 @@ const BeautifulContentModal = ({ open, onOpenChange, generation, notes }: Beauti
               </div>
 
               {/* Content Area */}
-              <div className="flex-1 overflow-y-auto">
+              <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
                 <div className="p-6 space-y-5">
                   {/* Original Input */}
                   {generation.original_input && (

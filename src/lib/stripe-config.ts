@@ -14,9 +14,10 @@ export const STRIPE_PLANS = {
       monthlyEquivalent: 11.20,
     },
     limits: {
-      ideasPerMonth: 100,
+      ideasPerMonth: 60,
       videosPerMonth: 20,
       platforms: "all",
+      projectsLimit: 10,
     },
   },
   pro: {
@@ -33,18 +34,20 @@ export const STRIPE_PLANS = {
       monthlyEquivalent: 23.20,
     },
     limits: {
-      ideasPerMonth: "unlimited",
+      ideasPerMonth: 150,
       videosPerMonth: "unlimited",
       platforms: "all",
       priorityProcessing: true,
+      projectsLimit: 50,
     },
   },
   free: {
     name: "Free",
     limits: {
-      ideasPerMonth: 5,
+      ideasPerMonth: 10,
       videosPerMonth: 2,
       platforms: 3,
+      projectsLimit: 2,
     },
   },
 } as const;

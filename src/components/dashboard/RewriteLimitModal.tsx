@@ -17,8 +17,8 @@ interface RewriteLimitModalProps {
 
 const planTiers = [
   { name: "Free", rewrites: 1, highlight: false },
-  { name: "Creator", rewrites: 3, highlight: false },
-  { name: "Pro", rewrites: 5, highlight: true },
+  { name: "Creator", rewrites: 2, highlight: false },
+  { name: "Pro", rewrites: 3, highlight: true },
 ];
 
 const RewriteLimitModal = ({

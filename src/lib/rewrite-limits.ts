@@ -1,8 +1,8 @@
 // Rewrite limits based on user plan
 export const REWRITE_LIMITS: Record<string, number> = {
   free: 1,
-  creator: 3,
-  pro: 5,
+  creator: 2,
+  pro: 3,
 };
 
 export const getRewriteLimit = (plan: string | null): number => {

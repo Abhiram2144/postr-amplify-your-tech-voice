@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Header from "@/components/landing/Header";
 import Footer from "@/components/landing/Footer";
 import { Button } from "@/components/ui/button";
@@ -9,17 +9,55 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useToast } from "@/hooks/use-toast";
 import { getSafeErrorMessage } from "@/lib/errors";
-import { STRIPE_PLANS, type BillingCycle } from "@/lib/stripe-config";
+import { STRIPE_PLANS, type BillingCycle, type PlanType } from "@/lib/stripe-config";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { supabase } from "@/integrations/supabase/client";
 
 const Pricing = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const { plan: currentPlan, openCheckout } = useSubscription();
+  const { plan: subscriptionPlan, checkSubscription, openCheckout } = useSubscription();
   const { toast } = useToast();
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const [profilePlan, setProfilePlan] = useState<PlanType>("free");
+
+  // Fetch user profile plan
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!user?.id) return;
+
+      try {
+        const { data, error } = await supabase
+          .from("users")
+          .select("plan")
+          .eq("id", user.id)
+          .single();
+
+        if (error) throw error;
+        
+        const plan = data?.plan?.toLowerCase() || "free";
+        if (plan.includes("pro")) setProfilePlan("pro");
+        else if (plan.includes("creator")) setProfilePlan("creator");
+        else setProfilePlan("free");
+      } catch (error) {
+        console.error("Error fetching profile:", error);
+      }
+    };
+
+    fetchProfile();
+  }, [user?.id]);
+
+  // Check subscription status when user loads
+  useEffect(() => {
+    if (user && !authLoading) {
+      checkSubscription();
+    }
+  }, [user, authLoading, checkSubscription]);
+
+  // Use subscription plan if not free, otherwise fall back to profile plan
+  const currentPlan = subscriptionPlan !== "free" ? subscriptionPlan : profilePlan;
 
   const plans = [
     {
@@ -28,13 +66,15 @@ const Pricing = () => {
       price: "$0",
       period: "forever",
       description: "For creators exploring content generation",
-      cta: "Get started",
+      cta: currentPlan === "free" ? "Current plan" : "Get started",
       variant: "heroOutline" as const,
       highlighted: false,
       bestFor: "Exploring",
       features: [
-        "5 ideas per month",
+        "10 ideas per month",
         "2 video uploads",
+        "2 projects max",
+        "1 free rewrite",
         "Text and video input",
         "Basic content analysis",
         "3 platforms",
@@ -50,7 +90,7 @@ const Pricing = () => {
       period: billingCycle === "monthly" ? "/month" : "/month (billed yearly)",
       yearlyTotal: billingCycle === "yearly" ? `$${STRIPE_PLANS.creator.yearly.price}/year` : null,
       description: "For creators posting consistently",
-      cta: currentPlan === "creator" ? "Current plan" : "Start free trial",
+      cta: currentPlan === "creator" ? "Current plan" : "Upgrade",
       variant: "hero" as const,
       highlighted: true,
       bestFor: "Growing",
@@ -58,8 +98,10 @@ const Pricing = () => {
         ? STRIPE_PLANS.creator.monthly.priceId 
         : STRIPE_PLANS.creator.yearly.priceId,
       features: [
-        "100 ideas per month",
+        "60 ideas per month",
         "20 video uploads",
+        "10 projects max",
+        "2 free rewrites",
         "Text and video input",
         "Advanced content analysis",
         "Unlimited platform exports",
@@ -76,7 +118,7 @@ const Pricing = () => {
       period: billingCycle === "monthly" ? "/month" : "/month (billed yearly)",
       yearlyTotal: billingCycle === "yearly" ? `$${STRIPE_PLANS.pro.yearly.price}/year` : null,
       description: "For creators scaling their reach",
-      cta: currentPlan === "pro" ? "Current plan" : "Start free trial",
+      cta: currentPlan === "pro" ? "Current plan" : "Upgrade",
       variant: "heroOutline" as const,
       highlighted: false,
       bestFor: "Scaling",
@@ -84,8 +126,10 @@ const Pricing = () => {
         ? STRIPE_PLANS.pro.monthly.priceId 
         : STRIPE_PLANS.pro.yearly.priceId,
       features: [
-        "Unlimited ideas",
+        "150 ideas per month",
         "Unlimited video uploads",
+        "50 projects max",
+        "3 free rewrites",
         "Text and video input",
         "Deep content analysis",
         "Unlimited platform exports",
@@ -257,15 +301,6 @@ const Pricing = () => {
               </motion.div>
             ))}
           </div>
-
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            className="mt-8 text-center text-sm text-muted-foreground"
-          >
-            All paid plans include a 14-day free trial. Cancel anytime.
-          </motion.p>
         </div>
       </main>
       <Footer />

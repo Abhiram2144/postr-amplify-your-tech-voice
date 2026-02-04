@@ -17,8 +17,8 @@ const PLAN_MAPPING: Record<string, string> = {
 
 const PLAN_LIMITS: Record<string, { monthly_generation_limit: number; monthly_video_limit: number }> = {
   "free": { monthly_generation_limit: 10, monthly_video_limit: 2 },
-  "creator": { monthly_generation_limit: 100, monthly_video_limit: 20 },
-  "pro": { monthly_generation_limit: 999, monthly_video_limit: 999 },
+  "creator": { monthly_generation_limit: 60, monthly_video_limit: 20 },
+  "pro": { monthly_generation_limit: 150, monthly_video_limit: 999 },
 };
 
 serve(async (req) => {

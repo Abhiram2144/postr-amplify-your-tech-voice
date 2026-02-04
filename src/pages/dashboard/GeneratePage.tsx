@@ -429,7 +429,7 @@ const GeneratePage = () => {
     if (!selectedProjectId) {
       toast({
         title: "No Project Selected",
-        description: "Please select a project to save your content.",
+        description: "Please select a project from the dropdown above to save your content.",
         variant: "destructive",
       });
       return;
@@ -1166,18 +1166,16 @@ const GeneratePage = () => {
                 <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                   {!variantsSaved && (
                     <>
-                      {selectedProjectId && (
-                        <Button
-                          variant="hero"
-                          size="lg"
-                          onClick={handleSaveSelectedToProject}
-                          disabled={isProcessing || Object.keys(selectedVariantByPlatform).length === 0}
-                          className="gap-2"
-                        >
-                          <Check className="h-5 w-5" />
-                          Save to Project
-                        </Button>
-                      )}
+                      <Button
+                        variant="hero"
+                        size="lg"
+                        onClick={handleSaveSelectedToProject}
+                        disabled={isProcessing || Object.keys(selectedVariantByPlatform).length === 0}
+                        className="gap-2"
+                      >
+                        <Check className="h-5 w-5" />
+                        Save to Project
+                      </Button>
                       <Button variant="outline" onClick={resetFlow}>
                         <Sparkles className="h-5 w-5 mr-2" />
                         Create More
