@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react";
-import { useOutletContext } from "react-router-dom";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { useOutletContext, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -169,12 +169,26 @@ interface PlatformOutput {
   content: string;
 }
 
+type GenerateResponse = {
+  analysis: AnalysisResult;
+  outputs: PlatformOutput[];
+  credits?: {
+    used: number;
+    limit: number;
+    remaining: number;
+  };
+};
+
 const GeneratePage = () => {
   const { profile } = useOutletContext<DashboardContext>();
-  const { session } = useAuth();
+  const { user, session } = useAuth();
   const { creditsUsed, creditsLimit, creditsRemaining, updateCreditsAfterGeneration } = useCredits();
   const { plan } = useSubscription();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+
+  const initialProjectId = searchParams.get("projectId");
+  const initialText = searchParams.get("text");
   
   // UI State
   const [currentStep, setCurrentStep] = useState<Step>(1);
@@ -182,6 +196,11 @@ const GeneratePage = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [copiedPlatform, setCopiedPlatform] = useState<string | null>(null);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
+
+  // Project selection (required to persist content because of RLS)
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(initialProjectId);
+  const [projectOptions, setProjectOptions] = useState<Array<{ id: string; title: string | null }>>([]);
+  const [projectsLoading, setProjectsLoading] = useState(false);
   
   // Brief Topic Mode Inputs
   const [topic, setTopic] = useState("");
@@ -199,6 +218,55 @@ const GeneratePage = () => {
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [outputs, setOutputs] = useState<PlatformOutput[]>([]);
 
+  useEffect(() => {
+    // Prefill topic from URL (e.g. converting a note -> generate)
+    if (initialText && initialText.trim().length > 0) {
+      setCreationMode("brief_topic");
+      setTopic(initialText);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const loadProjects = async () => {
+      if (!user?.id) {
+        setProjectOptions([]);
+        return;
+      }
+
+      try {
+        setProjectsLoading(true);
+        const { data, error } = await supabase
+          .from("projects")
+          .select("id, title")
+          .eq("user_id", user.id)
+          .order("updated_at", { ascending: false });
+
+        if (error) throw error;
+        setProjectOptions(data || []);
+      } catch (error) {
+        console.error("Error loading projects for picker:", error);
+        setProjectOptions([]);
+      } finally {
+        setProjectsLoading(false);
+      }
+    };
+
+    loadProjects();
+  }, [user?.id]);
+
+  const selectedProjectLabel = useMemo(() => {
+    if (!selectedProjectId) return null;
+    const match = projectOptions.find((p) => p.id === selectedProjectId);
+    return match?.title || "Untitled Project";
+  }, [projectOptions, selectedProjectId]);
+
+  const normalizedPlan = (plan || profile?.plan || "free").toLowerCase();
+  const videoCreditsLimit =
+    profile?.monthly_video_limit ?? (normalizedPlan.includes("pro") ? 999 : normalizedPlan.includes("creator") ? 20 : 2);
+  const videoCreditsUsed = 0;
+  const videoCreditsRemaining = Math.max(0, videoCreditsLimit - videoCreditsUsed);
+
   const canProceed = useCallback(() => {
     if (currentStep === 1) {
       if (userPlatforms.length === 0) return false;
@@ -209,6 +277,36 @@ const GeneratePage = () => {
     return true;
   }, [currentStep, creationMode, topic, scriptText, userPlatforms.length]);
 
+  const persistOutputs = async (projectId: string | null, payload: { analysis: AnalysisResult; outputs: PlatformOutput[] }, source: 'ai' | 'mock' | 'video_transcript' = 'ai') => {
+    if (!projectId) return;
+
+    const generationId = crypto.randomUUID();
+
+    const score = Math.round(
+      (payload.analysis.clarityScore + payload.analysis.hookStrength + payload.analysis.engagementScore + payload.analysis.structureScore) / 4,
+    );
+
+    const originalInput = creationMode === "script" ? scriptText.trim() : topic.trim();
+
+    const rows = payload.outputs.map((o) => ({
+      project_id: projectId,
+      generation_id: generationId,
+      platform: o.platform,
+      content: o.content,
+      content_type: "post",
+      original_input: originalInput,
+      input_type: creationMode,
+      analysis_score: score,
+      analysis_feedback: JSON.parse(JSON.stringify(payload.analysis)),
+      improved_content: null,
+      rewrite_count: 0,
+      generation_source: source, // Risk 2 Fix: Track content source
+    }));
+
+    const { error } = await supabase.from("content_outputs").insert(rows);
+    if (error) throw error;
+  };
+
   const handleCopy = async (platform: string, content: string) => {
     await navigator.clipboard.writeText(content);
     setCopiedPlatform(platform);
@@ -217,8 +315,8 @@ const GeneratePage = () => {
   };
 
   const handleGenerate = async () => {
-    // Check credits
-    if (creditsRemaining <= 0) {
+    // Check credits for text generation
+    if (creationMode !== "video" && creditsRemaining <= 0) {
       setShowCreditsModal(true);
       return;
     }
@@ -229,6 +327,30 @@ const GeneratePage = () => {
       setTimeout(() => {
         setAnalysis(MOCK_VIDEO_ANALYSIS.analysis);
         setOutputs(MOCK_VIDEO_ANALYSIS.outputs);
+        persistOutputs(selectedProjectId, { analysis: MOCK_VIDEO_ANALYSIS.analysis, outputs: MOCK_VIDEO_ANALYSIS.outputs }, 'mock') // Mark as mock
+          .then(() => {
+            if (selectedProjectId) {
+              toast({
+                title: "Saved to project",
+                description: selectedProjectLabel ? `Saved under "${selectedProjectLabel}".` : "Saved under your selected project.",
+              });
+            } else {
+              toast({
+                title: "Generated",
+                description: "Not saved — link a project to save this output.",
+              });
+            }
+          })
+          .catch((e) => {
+            console.error("Failed to save outputs:", e);
+            if (selectedProjectId) {
+              toast({
+                title: "Generated, but not saved",
+                description: "Could not save this output to your project.",
+                variant: "destructive",
+              });
+            }
+          });
         setIsProcessing(false);
         setCurrentStep(2);
       }, 1500);
@@ -238,48 +360,61 @@ const GeneratePage = () => {
     setIsProcessing(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke("generate-content", {
-        body: {
-          mode: creationMode,
-          topic: creationMode === "brief_topic" ? topic : undefined,
-          audience: creationMode === "brief_topic" ? audience : undefined,
-          intent: creationMode === "brief_topic" ? intent : undefined,
-          tone: creationMode === "brief_topic" ? tone : undefined,
-          script_text: creationMode === "script" ? scriptText : undefined,
-          platforms: userPlatforms,
-        },
-        headers: {
-          Authorization: `Bearer ${session?.access_token}`,
-        },
-      });
+      const generated: GenerateResponse = await (async () => {
+        const { data, error } = await supabase.functions.invoke("generate-content", {
+          body: {
+            mode: creationMode,
+            topic: creationMode === "brief_topic" ? topic : undefined,
+            audience: creationMode === "brief_topic" ? audience : undefined,
+            intent: creationMode === "brief_topic" ? intent : undefined,
+            tone: creationMode === "brief_topic" ? tone : undefined,
+            script_text: creationMode === "script" ? scriptText : undefined,
+            platforms: userPlatforms,
+          },
+          headers: {
+            Authorization: `Bearer ${session?.access_token}`,
+          },
+        });
 
-      if (error) throw error;
+        if (error) throw error;
+        if (data.error === "insufficient_credits") {
+          setShowCreditsModal(true);
+          throw new Error("insufficient_credits");
+        }
+        if (data.error) throw new Error(data.error);
+        return {
+          analysis: data.analysis as AnalysisResult,
+          outputs: data.outputs as PlatformOutput[],
+          credits: data.credits as GenerateResponse["credits"],
+        };
+      })();
 
-      if (data.error === "insufficient_credits") {
-        setShowCreditsModal(true);
-        return;
-      }
+      setAnalysis(generated.analysis);
+      setOutputs(generated.outputs);
 
-      if (data.error) {
-        throw new Error(data.error);
-      }
-
-      setAnalysis(data.analysis);
-      setOutputs(data.outputs);
+      // Persist generated outputs to the selected project (mark as 'ai' source)
+      await persistOutputs(selectedProjectId, { analysis: generated.analysis, outputs: generated.outputs }, 'ai');
       
       // Update credits in hook
-      if (data.credits) {
-        updateCreditsAfterGeneration(data.credits.used);
+      if (generated.credits?.used !== undefined) {
+        updateCreditsAfterGeneration(generated.credits.used);
       }
       
       setCurrentStep(2);
       
       toast({
         title: "Content Generated!",
-        description: `Used 1 credit. ${data.credits?.remaining || creditsRemaining - 1} remaining.`,
+        description: selectedProjectId
+          ? `Saved under "${selectedProjectLabel || "your project"}". ${generated.credits?.remaining ?? creditsRemaining - 1} credits remaining.`
+          : `Generated (not saved). ${generated.credits?.remaining ?? creditsRemaining - 1} credits remaining.`,
       });
     } catch (error) {
       console.error("Generation error:", error);
+
+      if (error instanceof Error && error.message === "insufficient_credits") {
+        return;
+      }
+
       toast({
         title: "Generation Failed",
         description: error instanceof Error ? error.message : "Something went wrong",
@@ -318,7 +453,12 @@ const GeneratePage = () => {
             <h1 className="text-2xl lg:text-3xl font-bold text-foreground">Create Content</h1>
             <p className="text-muted-foreground mt-1">Transform your ideas into platform-ready posts</p>
           </div>
-          <CreditsIndicator />
+          <CreditsIndicator
+            label={creationMode === "video" ? "Video credits" : "Text credits"}
+            used={creationMode === "video" ? videoCreditsUsed : undefined}
+            limit={creationMode === "video" ? videoCreditsLimit : undefined}
+            remaining={creationMode === "video" ? videoCreditsRemaining : undefined}
+          />
         </div>
 
         {/* Progress Steps */}
@@ -536,6 +676,30 @@ const GeneratePage = () => {
                       </div>
                     </div>
                   )}
+
+                  <div className="pt-2 border-t space-y-2">
+                    <Label>Link to a project (optional)</Label>
+                    <Select
+                      value={selectedProjectId ?? "__none__"}
+                      onValueChange={(v) => setSelectedProjectId(v === "__none__" ? null : v)}
+                      disabled={projectsLoading}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder={projectsLoading ? "Loading projects..." : "Don't link to a project"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Don't link to a project</SelectItem>
+                        {projectOptions.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.title || "Untitled Project"}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Link a project if you want this generation to appear in Projects and History.
+                    </p>
+                  </div>
                 </CardContent>
               </Card>
 

@@ -4,7 +4,14 @@ import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Zap } from "lucide-react";
 
-const CreditsIndicator = () => {
+interface CreditsIndicatorProps {
+  used?: number;
+  limit?: number;
+  remaining?: number;
+  label?: string;
+}
+
+const CreditsIndicator = ({ used, limit, remaining, label }: CreditsIndicatorProps) => {
   const { creditsUsed, creditsLimit, creditsRemaining, loading } = useCredits();
   const { plan } = useSubscription();
 
@@ -16,9 +23,13 @@ const CreditsIndicator = () => {
     );
   }
 
-  const percentage = Math.min(100, (creditsUsed / creditsLimit) * 100);
+  const effectiveUsed = used ?? creditsUsed;
+  const effectiveLimit = limit ?? creditsLimit;
+  const effectiveRemaining = remaining ?? creditsRemaining;
+
+  const percentage = effectiveLimit > 0 ? Math.min(100, (effectiveUsed / effectiveLimit) * 100) : 0;
   const isLow = percentage >= 80;
-  const isExhausted = creditsRemaining === 0;
+  const isExhausted = effectiveRemaining === 0;
 
   return (
     <Tooltip>
@@ -38,16 +49,16 @@ const CreditsIndicator = () => {
               : "text-primary"
           }`} />
           <span className="text-sm font-medium">
-            {creditsRemaining}/{creditsLimit}
+            {effectiveRemaining}/{effectiveLimit}
           </span>
         </div>
       </TooltipTrigger>
       <TooltipContent side="bottom" className="max-w-[200px]">
         <div className="space-y-2">
-          <p className="font-medium">Monthly Credits</p>
+          <p className="font-medium">{label || "Monthly Credits"}</p>
           <Progress value={percentage} className="h-1.5" />
           <p className="text-xs text-muted-foreground">
-            {creditsUsed} used of {creditsLimit} ({plan} plan)
+            {effectiveUsed} used of {effectiveLimit} ({plan} plan)
           </p>
           {isExhausted && (
             <p className="text-xs text-destructive">Upgrade for more credits!</p>

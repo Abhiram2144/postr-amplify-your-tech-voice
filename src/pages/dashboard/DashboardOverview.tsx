@@ -16,6 +16,9 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { STRIPE_PLANS, PlanType } from "@/lib/stripe-config";
 import type { UserProfile } from "@/components/dashboard/DashboardLayout";
 import CheckoutSuccessModal from "@/components/dashboard/CheckoutSuccessModal";
+import { useProjects } from "@/hooks/useProjects";
+import { useCredits } from "@/hooks/useCredits";
+import { format } from "date-fns";
 
 interface DashboardContext {
   profile: UserProfile | null;
@@ -42,6 +45,8 @@ const DashboardOverview = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { plan, checkSubscription } = useSubscription();
   const [showCheckoutSuccess, setShowCheckoutSuccess] = useState(false);
+  const { projects, loading: projectsLoading } = useProjects();
+  const { creditsUsed, creditsLimit, creditsRemaining, loading: creditsLoading } = useCredits();
 
   // Check for checkout success param
   useEffect(() => {
@@ -70,31 +75,26 @@ const DashboardOverview = () => {
   const generationsTotal = planConfig.limits.ideasPerMonth;
   const videosTotal = planConfig.limits.videosPerMonth;
 
-  // Cap remaining values to not exceed plan limits
-  const generationsRemaining = 
-    typeof generationsTotal === "number"
-      ? Math.min(profile?.monthly_generation_limit ?? generationsTotal, generationsTotal)
-      : profile?.monthly_generation_limit ?? null;
-  const videosRemaining = 
-    typeof videosTotal === "number"
-      ? Math.min(profile?.monthly_video_limit ?? videosTotal, videosTotal)
-      : profile?.monthly_video_limit ?? null;
-
-  const generationsPercent =
-    typeof generationsTotal === "number"
-      ? Math.min(100, Math.max(0, ((generationsRemaining ?? generationsTotal) / generationsTotal) * 100))
-      : 100;
-  const videosPercent =
-    typeof videosTotal === "number"
-      ? Math.min(100, Math.max(0, ((videosRemaining ?? videosTotal) / videosTotal) * 100))
-      : 100;
-
   const formatLimit = (value: number | "unlimited") => (value === "unlimited" ? "Unlimited" : value);
-  const generationsRemainingLabel = generationsTotal === "unlimited" ? "Unlimited" : generationsRemaining ?? generationsTotal;
-  const videosRemainingLabel = videosTotal === "unlimited" ? "Unlimited" : videosRemaining ?? videosTotal;
 
-  // Placeholder recent projects (empty state for now)
-  const recentProjects: Array<{ id: string; title: string; type: string; date: string }> = [];
+  const effectiveTextLimit = creditsLoading ? (typeof generationsTotal === "number" ? generationsTotal : creditsLimit) : creditsLimit;
+  const effectiveTextUsed = creditsLoading ? 0 : creditsUsed;
+  const effectiveTextRemaining = creditsLoading ? 0 : creditsRemaining;
+  const generationsPercent = effectiveTextLimit > 0 ? Math.min(100, Math.max(0, (effectiveTextRemaining / effectiveTextLimit) * 100)) : 0;
+
+  const effectiveVideoLimit = typeof videosTotal === "number" ? videosTotal : (profile?.monthly_video_limit ?? 0);
+  const effectiveVideoRemaining = profile?.monthly_video_limit ?? effectiveVideoLimit;
+  const videosPercent = effectiveVideoLimit > 0 ? Math.min(100, Math.max(0, (effectiveVideoRemaining / effectiveVideoLimit) * 100)) : 0;
+
+  const generationsRemainingLabel = generationsTotal === "unlimited" ? "Unlimited" : effectiveTextRemaining;
+  const videosRemainingLabel = videosTotal === "unlimited" ? "Unlimited" : effectiveVideoRemaining;
+
+  const recentProjects = projects.slice(0, 4).map((p) => ({
+    id: p.id,
+    title: p.title || "Untitled Project",
+    type: p.input_type || "text",
+    date: p.updated_at ? format(new Date(p.updated_at), "MMM d, yyyy") : "",
+  }));
 
   const tips = [
     "Tip: Paste a LinkedIn post to instantly adapt it for X and Threads.",
@@ -177,7 +177,7 @@ const DashboardOverview = () => {
                   <span className="text-2xl font-bold text-foreground">
                     {generationsRemainingLabel}
                   </span>
-                  <span className="text-sm text-muted-foreground">/ {formatLimit(generationsTotal)}</span>
+                  <span className="text-sm text-muted-foreground">/ {generationsTotal === "unlimited" ? formatLimit(generationsTotal) : effectiveTextLimit}</span>
                 </div>
                 <p className="text-sm text-muted-foreground">Generations left</p>
               </div>
@@ -212,7 +212,7 @@ const DashboardOverview = () => {
                   <span className="text-2xl font-bold text-foreground">
                     {videosRemainingLabel}
                   </span>
-                  <span className="text-sm text-muted-foreground">/ {formatLimit(videosTotal)}</span>
+                  <span className="text-sm text-muted-foreground">/ {videosTotal === "unlimited" ? formatLimit(videosTotal) : effectiveVideoLimit}</span>
                 </div>
                 <p className="text-sm text-muted-foreground">Videos left</p>
               </div>
@@ -267,7 +267,7 @@ const DashboardOverview = () => {
                 <Button
                   variant="outline"
                   className="gap-2"
-                  onClick={() => navigate("/dashboard/generate")}
+                  onClick={() => navigate("/dashboard/projects")}
                 >
                   <Plus className="h-4 w-4" />
                   Create your first project
@@ -280,7 +280,7 @@ const DashboardOverview = () => {
                 <Card
                   key={project.id}
                   className="cursor-pointer hover:border-primary/30 transition-colors duration-200"
-                  onClick={() => navigate(`/dashboard/generate?project=${project.id}`)}
+                  onClick={() => navigate(`/dashboard/projects/${project.id}`)}
                 >
                   <CardContent className="p-4 flex items-center gap-4">
                     <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">

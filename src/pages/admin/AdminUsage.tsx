@@ -3,13 +3,19 @@ import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
-import { BarChart3, FileText, Video, Users } from "lucide-react";
+import { BarChart3, FileText, Video, Users, Zap, TrendingDown, TrendingUp } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 
 interface UsageStats {
   totalGenerations: number;
   totalVideos: number;
   averagePerUser: number;
   topUsers: Array<{ email: string; count: number }>;
+  totalCreditsAllocated: number;
+  totalCreditsUsed: number;
+  usersAtLimit: number;
+  usersNearLimit: number;
+  avgCreditConsumption: number;
 }
 
 const containerVariants = {
@@ -31,6 +37,11 @@ const AdminUsage = () => {
     totalVideos: 0,
     averagePerUser: 0,
     topUsers: [],
+    totalCreditsAllocated: 0,
+    totalCreditsUsed: 0,
+    usersAtLimit: 0,
+    usersNearLimit: 0,
+    avgCreditConsumption: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -76,11 +87,37 @@ const AdminUsage = () => {
             count,
           }));
 
+        // Fetch user credit allocation and usage
+        const { data: creditData } = await supabase
+          .from("users")
+          .select("monthly_generation_limit, generations_used_this_month");
+
+        let totalCreditsAllocated = 0;
+        let totalCreditsUsed = 0;
+        let usersAtLimit = 0;
+        let usersNearLimit = 0;
+
+        creditData?.forEach(user => {
+          totalCreditsAllocated += user.monthly_generation_limit || 10;
+          totalCreditsUsed += user.generations_used_this_month || 0;
+          const limit = user.monthly_generation_limit || 10;
+          const used = user.generations_used_this_month || 0;
+          if (used >= limit) usersAtLimit++;
+          if (used > 0 && used >= limit * 0.8) usersNearLimit++;
+        });
+
+        const avgCreditConsumption = creditData?.length ? Math.round(totalCreditsUsed / creditData.length) : 0;
+
         setStats({
           totalGenerations,
           totalVideos,
           averagePerUser,
           topUsers,
+          totalCreditsAllocated,
+          totalCreditsUsed,
+          usersAtLimit,
+          usersNearLimit,
+          avgCreditConsumption,
         });
       } catch (error) {
         console.error("Error fetching usage:", error);
@@ -145,6 +182,55 @@ const AdminUsage = () => {
               <div className="text-2xl font-bold">
                 {loading ? "..." : stats.averagePerUser}
               </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div variants={itemVariants} className="grid gap-4 md:grid-cols-3">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Credits Allocated
+              </CardTitle>
+              <Zap className="h-4 w-4 text-yellow-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {loading ? "..." : stats.totalCreditsAllocated.toLocaleString()}
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">Total monthly quota</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Credits Used
+              </CardTitle>
+              <TrendingUp className="h-4 w-4 text-orange-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {loading ? "..." : stats.totalCreditsUsed.toLocaleString()}
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                {Math.round((stats.totalCreditsUsed / Math.max(stats.totalCreditsAllocated, 1)) * 100)}% utilization
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Users at Limit
+              </CardTitle>
+              <TrendingDown className="h-4 w-4 text-red-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {loading ? "..." : stats.usersAtLimit}
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">{stats.usersNearLimit - stats.usersAtLimit} more near limit</p>
             </CardContent>
           </Card>
         </motion.div>

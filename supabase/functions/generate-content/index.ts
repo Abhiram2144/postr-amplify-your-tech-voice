@@ -188,9 +188,26 @@ serve(async (req) => {
       logStep("Monthly usage reset detected");
     }
 
-    // Credit check
-    if (usedThisMonth >= userProfile.monthly_generation_limit) {
-      logStep("Insufficient credits", { used: usedThisMonth, limit: userProfile.monthly_generation_limit });
+    // Risk 1 Fix: Atomic credit check + increment (prevents race conditions)
+    // Use UPDATE with WHERE condition to ensure only one request succeeds
+    const { data: creditDeduction, error: creditError } = await supabaseClient
+      .from("users")
+      .update({
+        generations_used_this_month: usedThisMonth + 1,
+        usage_reset_month: currentMonth,
+        usage_reset_year: currentYear,
+      })
+      .eq("id", user.id)
+      .lte("generations_used_this_month", userProfile.monthly_generation_limit)
+      .select("generations_used_this_month, monthly_generation_limit")
+      .single();
+
+    // If no rows updated, user is at/over limit (race condition caught)
+    if (creditError || !creditDeduction) {
+      logStep("Credit deduction failed (race condition or limit reached)", { 
+        used: usedThisMonth, 
+        limit: userProfile.monthly_generation_limit 
+      });
       return new Response(JSON.stringify({ 
         error: "insufficient_credits",
         message: "You've reached your monthly generation limit. Upgrade your plan for more credits.",
@@ -201,6 +218,11 @@ serve(async (req) => {
         status: 402,
       });
     }
+
+    logStep("Credit deducted atomically", { 
+      newUsage: creditDeduction.generations_used_this_month,
+      limit: creditDeduction.monthly_generation_limit 
+    });
 
     // Get Lovable AI key
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -326,38 +348,23 @@ Return ONLY valid JSON, no markdown code blocks or additional text.`;
       throw new Error("Failed to parse AI response");
     }
 
-    // Deduct credit after successful generation
-    const { error: updateError } = await supabaseClient
-      .from("users")
-      .update({
-        generations_used_this_month: usedThisMonth + 1,
-        usage_reset_month: currentMonth,
-        usage_reset_year: currentYear,
-      })
-      .eq("id", user.id);
-
-    if (updateError) {
-      logStep("Failed to update usage");
-      // Don't fail the request, just log it
-    }
-
-    // Log usage
+    // Log usage (credit was already deducted atomically above)
     await supabaseClient.from("usage_logs").insert({
       user_id: user.id,
       action: `generate_content_${mode}`,
       units: 1,
     });
 
-    logStep("Generation complete", { creditsUsed: 1, newTotal: usedThisMonth + 1 });
+    logStep("Generation complete", { creditsUsed: 1, newTotal: creditDeduction.generations_used_this_month });
 
     return new Response(JSON.stringify({
       success: true,
       analysis: parsedResponse.analysis,
       outputs: parsedResponse.outputs,
       credits: {
-        used: usedThisMonth + 1,
-        limit: userProfile.monthly_generation_limit,
-        remaining: userProfile.monthly_generation_limit - (usedThisMonth + 1),
+        used: creditDeduction.generations_used_this_month,
+        limit: creditDeduction.monthly_generation_limit,
+        remaining: creditDeduction.monthly_generation_limit - creditDeduction.generations_used_this_month,
       }
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

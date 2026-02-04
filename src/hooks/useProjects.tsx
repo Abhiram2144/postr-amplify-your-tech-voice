@@ -21,6 +21,7 @@ export interface Project {
 
 export interface ContentOutput {
   id: string;
+  generation_id: string;
   project_id: string | null;
   content: string | null;
   content_type: string | null;
@@ -39,6 +40,7 @@ export interface ProjectNote {
   id: string;
   project_id: string;
   text: string;
+  content_output_id?: string | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -242,6 +244,7 @@ export const useProjectContents = (projectId: string | null) => {
       if (error) throw error;
       setContents((data || []).map(item => ({
         ...item,
+        generation_id: item.generation_id || item.id,
         rewrite_count: item.rewrite_count || 0,
         analysis_feedback: item.analysis_feedback as Record<string, unknown> | null,
       })));
@@ -279,7 +282,30 @@ export const useProjectContents = (projectId: string | null) => {
     }
   };
 
-  return { contents, loading, fetchContents, deleteContent };
+  const deleteGeneration = async (generationId: string) => {
+    try {
+      const { error } = await supabase
+        .from("content_outputs")
+        .delete()
+        .eq("generation_id", generationId);
+
+      if (error) throw error;
+      await fetchContents();
+      toast({
+        title: "Content deleted",
+        description: "The generation has been removed",
+      });
+    } catch (error) {
+      console.error("Error deleting generation:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete content",
+        variant: "destructive",
+      });
+    }
+  };
+
+  return { contents, loading, fetchContents, deleteContent, deleteGeneration };
 };
 
 export const useProjectNotes = (projectId: string | null) => {
@@ -314,13 +340,13 @@ export const useProjectNotes = (projectId: string | null) => {
     fetchNotes();
   }, [fetchNotes]);
 
-  const createNote = async (text: string) => {
+  const createNote = async (text: string, contentOutputId?: string | null) => {
     if (!projectId) return null;
 
     try {
       const { data, error } = await supabase
         .from("project_notes")
-        .insert({ project_id: projectId, text })
+        .insert({ project_id: projectId, text, content_output_id: contentOutputId ?? null })
         .select()
         .single();
 
@@ -342,11 +368,11 @@ export const useProjectNotes = (projectId: string | null) => {
     }
   };
 
-  const updateNote = async (id: string, text: string) => {
+  const updateNote = async (id: string, updates: { text?: string; content_output_id?: string | null }) => {
     try {
       const { error } = await supabase
         .from("project_notes")
-        .update({ text })
+        .update(updates)
         .eq("id", id);
 
       if (error) throw error;

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import LinkContentModal from "@/components/dashboard/LinkContentModal";
+import GenerationOutputsModal from "@/components/dashboard/GenerationOutputsModal";
+import BeautifulContentModal from "@/components/dashboard/BeautifulContentModal";
+import { ContentActionMenu } from "@/components/dashboard/ContentActionMenu";
 import {
   Select,
   SelectContent,
@@ -27,9 +31,11 @@ import {
   Filter,
   Sparkles,
   TrendingUp,
+  Link2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useProjectContents, useProjectNotes, type Project, type ContentOutput, type ProjectNote } from "@/hooks/useProjects";
+import { groupContentOutputs } from "@/lib/content-generations";
 import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 
@@ -65,9 +71,36 @@ const ProjectDetailPage = () => {
   const [newNoteText, setNewNoteText] = useState("");
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingNoteText, setEditingNoteText] = useState("");
+  const [newNoteLinkedContentId, setNewNoteLinkedContentId] = useState<string | null>(null);
+  const [linkModalOpen, setLinkModalOpen] = useState(false);
+  const [linkTargetIsNew, setLinkTargetIsNew] = useState(false);
+  const [linkTargetNoteId, setLinkTargetNoteId] = useState<string | null>(null);
+  const [viewGenerationOpen, setViewGenerationOpen] = useState(false);
+  const [viewGenerationId, setViewGenerationId] = useState<string | null>(null);
 
-  const { contents, loading: contentsLoading, deleteContent } = useProjectContents(projectId || null);
+  const { contents, loading: contentsLoading, deleteGeneration } = useProjectContents(projectId || null);
   const { notes, loading: notesLoading, createNote, updateNote, deleteNote } = useProjectNotes(projectId || null);
+
+  const contentById = useMemo(() => {
+    return new Map(contents.map((c) => [c.id, c] as const));
+  }, [contents]);
+
+  const generations = useMemo(() => groupContentOutputs(contents), [contents]);
+
+  const generationById = useMemo(() => {
+    return new Map(generations.map((g) => [g.generation_id, g] as const));
+  }, [generations]);
+
+  const selectedGeneration = useMemo(() => {
+    if (!viewGenerationId) return null;
+    return generationById.get(viewGenerationId) ?? null;
+  }, [generationById, viewGenerationId]);
+
+  const selectedGenerationNotes = useMemo(() => {
+    if (!selectedGeneration) return [];
+    const outputIds = new Set(selectedGeneration.outputs.map((o) => o.id));
+    return notes.filter((n) => n.content_output_id && outputIds.has(n.content_output_id));
+  }, [notes, selectedGeneration]);
 
   const fetchProject = useCallback(async () => {
     if (!projectId) return;
@@ -111,15 +144,28 @@ const ProjectDetailPage = () => {
 
   const handleAddNote = async () => {
     if (!newNoteText.trim()) return;
-    await createNote(newNoteText.trim());
+    await createNote(newNoteText.trim(), newNoteLinkedContentId);
     setNewNoteText("");
+    setNewNoteLinkedContentId(null);
   };
 
   const handleSaveNote = async (id: string) => {
     if (!editingNoteText.trim()) return;
-    await updateNote(id, editingNoteText.trim());
+    await updateNote(id, { text: editingNoteText.trim() });
     setEditingNoteId(null);
     setEditingNoteText("");
+  };
+
+  const openLinkModalForNewNote = () => {
+    setLinkTargetIsNew(true);
+    setLinkTargetNoteId(null);
+    setLinkModalOpen(true);
+  };
+
+  const openLinkModalForExistingNote = (noteId: string) => {
+    setLinkTargetIsNew(false);
+    setLinkTargetNoteId(noteId);
+    setLinkModalOpen(true);
   };
 
   const handleConvertNoteToContent = (note: ProjectNote) => {
@@ -127,13 +173,14 @@ const ProjectDetailPage = () => {
     navigate(`/dashboard/generate?text=${encodeURIComponent(note.text)}&projectId=${projectId}`);
   };
 
-  // Filter and sort contents
-  const filteredContents = contents
-    .filter((c) => {
-      const matchesSearch = 
-        (c.content || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (c.original_input || "").toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesPlatform = platformFilter === "all" || c.platform === platformFilter;
+  // Filter and sort generations
+  const filteredGenerations = generations
+    .filter((g) => {
+      const q = searchQuery.toLowerCase();
+      const matchesSearch =
+        (g.original_input || "").toLowerCase().includes(q) ||
+        g.outputs.some((o) => (o.content || "").toLowerCase().includes(q));
+      const matchesPlatform = platformFilter === "all" || g.platforms.includes(platformFilter);
       return matchesSearch && matchesPlatform;
     })
     .sort((a, b) => {
@@ -213,7 +260,7 @@ const ProjectDetailPage = () => {
           <TabsList>
             <TabsTrigger value="contents" className="gap-2">
               <FileText className="h-4 w-4" />
-              Contents ({contents.length})
+              Contents ({generations.length})
             </TabsTrigger>
             <TabsTrigger value="notes" className="gap-2">
               <StickyNote className="h-4 w-4" />
@@ -272,7 +319,7 @@ const ProjectDetailPage = () => {
                   </Card>
                 ))}
               </div>
-            ) : filteredContents.length === 0 ? (
+            ) : filteredGenerations.length === 0 ? (
               <Card className="border-dashed">
                 <CardContent className="p-12 flex flex-col items-center text-center">
                   <div className="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
@@ -297,69 +344,106 @@ const ProjectDetailPage = () => {
             ) : (
               <AnimatePresence mode="popLayout">
                 <div className="space-y-3">
-                  {filteredContents.map((content) => (
+                  {filteredGenerations.map((gen, index) => (
                     <motion.div
-                      key={content.id}
+                      key={gen.generation_id}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
+                      transition={{ delay: index * 0.05 }}
+                      className="group"
                     >
-                      <Card>
-                        <CardContent className="p-0">
-                          <div className="flex items-center justify-between p-4 border-b bg-muted/30">
-                            <div className="flex items-center gap-3 flex-wrap">
-                              {content.platform && (
-                                <span className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize border ${platformColors[content.platform.toLowerCase()] || "bg-muted text-muted-foreground"}`}>
-                                  {content.platform}
-                                </span>
-                              )}
-                              {content.analysis_score !== null && (
-                                <span className="flex items-center gap-1 text-sm">
-                                  <TrendingUp className="h-3.5 w-3.5 text-primary" />
-                                  <span className="font-medium">{content.analysis_score}</span>
-                                  <span className="text-muted-foreground">/100</span>
-                                </span>
-                              )}
-                              <span className="text-sm text-muted-foreground flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {content.created_at ? format(new Date(content.created_at), "MMM d, yyyy") : "No date"}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleCopy(content.id, content.content || "")}
-                              >
-                                {copiedId === content.id ? (
-                                  <>
-                                    <Check className="h-4 w-4 mr-1" />
-                                    Copied
-                                  </>
-                                ) : (
-                                  <>
-                                    <Copy className="h-4 w-4 mr-1" />
-                                    Copy
-                                  </>
-                                )}
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="text-destructive hover:text-destructive"
-                                onClick={() => deleteContent(content.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                          <div className="p-4">
-                            <p className="text-sm text-foreground whitespace-pre-wrap">
-                              {content.content}
-                            </p>
-                          </div>
-                        </CardContent>
-                      </Card>
+                      <button
+                        onClick={() => {
+                          setViewGenerationId(gen.generation_id);
+                          setViewGenerationOpen(true);
+                        }}
+                        className="w-full text-left"
+                      >
+                        <motion.div
+                          whileHover={{ y: -2 }}
+                          transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                        >
+                          <Card className="hover:shadow-md hover:border-primary/50 transition-all cursor-pointer overflow-hidden">
+                            <CardContent className="p-4">
+                              <div className="space-y-3">
+                                {/* Metadata Row */}
+                                <div className="flex items-center justify-between gap-4 flex-wrap">
+                                  {/* Platforms */}
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    {gen.platforms.length > 0 && (
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        {gen.platforms.slice(0, 3).map((p) => (
+                                          <motion.div
+                                            key={p}
+                                            whileHover={{ scale: 1.05 }}
+                                          >
+                                            <Badge
+                                              className={`capitalize text-xs font-semibold ${platformColors[p] || "bg-muted text-muted-foreground"}`}
+                                              variant="outline"
+                                            >
+                                              {p}
+                                            </Badge>
+                                          </motion.div>
+                                        ))}
+                                        {gen.platforms.length > 3 && (
+                                          <Badge variant="outline" className="text-xs">
+                                            +{gen.platforms.length - 3}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Score and Date */}
+                                  <div className="flex items-center gap-4 text-sm flex-wrap justify-end">
+                                    {gen.analysis_score !== null && (
+                                      <div className="flex items-center gap-1.5 bg-primary/10 px-2.5 py-1 rounded-full">
+                                        <TrendingUp className="h-3.5 w-3.5 text-primary" />
+                                        <span className="font-semibold text-primary">{gen.analysis_score}</span>
+                                        <span className="text-xs text-muted-foreground">/100</span>
+                                      </div>
+                                    )}
+                                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                                      <Clock className="h-3.5 w-3.5" />
+                                      <span className="text-xs">
+                                        {gen.created_at ? format(new Date(gen.created_at), "MMM d, yy") : "No date"}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Input Preview */}
+                                <div className="pt-1">
+                                  <p className="text-sm text-muted-foreground line-clamp-2 group-hover:text-foreground transition-colors">
+                                    {gen.original_input || "No description"}
+                                  </p>
+                                </div>
+
+                                {/* Character count and linked notes indicator */}
+                                <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
+                                  <span>{(gen.representative.content || "").length} characters</span>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      </button>
+
+                      {/* Action Menu */}
+                      <div className="flex justify-end">
+                        <ContentActionMenu
+                          onView={() => {
+                            setViewGenerationId(gen.generation_id);
+                            setViewGenerationOpen(true);
+                          }}
+                          onCopy={() => {
+                            handleCopy(gen.generation_id, gen.representative.content || "");
+                          }}
+                          onDelete={() => deleteGeneration(gen.generation_id)}
+                          isCopied={copiedId === gen.generation_id}
+                        />
+                      </div>
                     </motion.div>
                   ))}
                 </div>
@@ -372,18 +456,47 @@ const ProjectDetailPage = () => {
             {/* Add Note Input */}
             <Card>
               <CardContent className="p-4">
-                <div className="flex gap-3">
+                <div className="flex gap-3 flex-col sm:flex-row">
                   <Input
                     placeholder="Jot down an idea for future content..."
                     value={newNoteText}
                     onChange={(e) => setNewNoteText(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleAddNote()}
                   />
+                  <Button
+                    variant="outline"
+                    onClick={openLinkModalForNewNote}
+                    disabled={contents.length === 0}
+                    className="gap-2"
+                  >
+                    <Link2 className="h-4 w-4" />
+                    {newNoteLinkedContentId ? "Linked" : "Link content"}
+                  </Button>
                   <Button onClick={handleAddNote} disabled={!newNoteText.trim()}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add
                   </Button>
                 </div>
+                {newNoteLinkedContentId && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {(() => {
+                      const linked = contentById.get(newNoteLinkedContentId);
+                      const gen = linked?.generation_id ? generationById.get(linked.generation_id) : null;
+                      const platforms = gen?.platforms?.length ? gen.platforms.join(", ") : linked?.platform || "content";
+                      const date = gen?.created_at || linked?.created_at;
+                      return (
+                        <>
+                          Linked to: {platforms} • {date ? format(new Date(date), "MMM d, yyyy") : ""}
+                        </>
+                      );
+                    })()}
+                  </p>
+                )}
+                {contents.length === 0 && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    No generated content yet. Generate content first to link notes.
+                  </p>
+                )}
               </CardContent>
             </Card>
 
@@ -447,11 +560,32 @@ const ProjectDetailPage = () => {
                             <div className="flex items-start justify-between gap-4">
                               <div className="flex-1">
                                 <p className="text-foreground">{note.text}</p>
+                                {note.content_output_id && contentById.get(note.content_output_id) && (
+                                  <div className="mt-2">
+                                    <Badge variant="secondary" className="gap-1">
+                                      <Link2 className="h-3.5 w-3.5" />
+                                      {(() => {
+                                        const linked = contentById.get(note.content_output_id!);
+                                        const gen = linked?.generation_id ? generationById.get(linked.generation_id) : null;
+                                        const platforms = gen?.platforms?.length ? gen.platforms.join(", ") : linked?.platform || "content";
+                                        return <>Linked: {platforms}</>;
+                                      })()}
+                                    </Badge>
+                                  </div>
+                                )}
                                 <p className="text-xs text-muted-foreground mt-2">
                                   {note.created_at ? format(new Date(note.created_at), "MMM d, yyyy 'at' h:mm a") : ""}
                                 </p>
                               </div>
                               <div className="flex items-center gap-1 shrink-0">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => openLinkModalForExistingNote(note.id)}
+                                >
+                                  <Link2 className="h-4 w-4 mr-1" />
+                                  Link
+                                </Button>
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -492,6 +626,42 @@ const ProjectDetailPage = () => {
           </TabsContent>
         </Tabs>
       </motion.div>
+
+      <LinkContentModal
+        open={linkModalOpen}
+        onOpenChange={setLinkModalOpen}
+        contents={contents}
+        selectedId={
+          linkTargetIsNew
+            ? newNoteLinkedContentId
+            : (linkTargetNoteId ? notes.find((n) => n.id === linkTargetNoteId)?.content_output_id ?? null : null)
+        }
+        onSelect={async (contentId) => {
+          if (linkTargetIsNew) {
+            setNewNoteLinkedContentId(contentId);
+            return;
+          }
+
+          if (!linkTargetNoteId) return;
+          await updateNote(linkTargetNoteId, { content_output_id: contentId });
+        }}
+        onClear={
+          linkTargetIsNew
+            ? () => setNewNoteLinkedContentId(null)
+            : linkTargetNoteId
+              ? async () => {
+                  await updateNote(linkTargetNoteId, { content_output_id: null });
+                }
+              : undefined
+        }
+      />
+
+      <BeautifulContentModal
+        open={viewGenerationOpen}
+        onOpenChange={setViewGenerationOpen}
+        generation={selectedGeneration}
+        notes={selectedGenerationNotes}
+      />
     </div>
   );
 };

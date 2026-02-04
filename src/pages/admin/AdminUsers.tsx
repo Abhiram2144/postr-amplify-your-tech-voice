@@ -19,7 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, MoreHorizontal, UserX, UserCheck, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
+import { Search, MoreHorizontal, UserX, UserCheck, ArrowUpCircle, ArrowDownCircle, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface User {
@@ -189,7 +189,8 @@ const AdminUsers = () => {
                       <TableHead>User</TableHead>
                       <TableHead>Plan</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Limits</TableHead>
+                      <TableHead>Credits Used</TableHead>
+                      <TableHead>Monthly Limit</TableHead>
                       <TableHead>Joined</TableHead>
                       <TableHead className="w-[50px]"></TableHead>
                     </TableRow>
@@ -213,10 +214,23 @@ const AdminUsers = () => {
                             {user.status || "active"}
                           </Badge>
                         </TableCell>
+                        <TableCell className="text-sm">
+                          <div className="flex items-center gap-2">
+                            <Zap className="h-3 w-3 text-yellow-500" />
+                            <span className="font-medium text-muted-foreground">
+                              {user.generations_used_this_month || 0}
+                            </span>
+                          </div>
+                        </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {user.monthly_generation_limit === 999 
                             ? "Unlimited" 
                             : `${user.monthly_generation_limit}/mo`}
+                          {user.monthly_generation_limit && user.monthly_generation_limit !== 999 && (
+                            <div className="text-xs mt-1">
+                              {Math.round(((user.generations_used_this_month || 0) / user.monthly_generation_limit) * 100)}% used
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {user.created_at 

@@ -145,7 +145,11 @@ const DashboardSidebar = ({ profile, collapsed, onToggleCollapse }: DashboardSid
         <Button
           variant="hero"
           className={`w-full gap-2 ${collapsed ? "px-0 justify-center" : ""}`}
-          onClick={() => navigate("/dashboard/generate")}
+          onClick={() => {
+            const match = location.pathname.match(/^\/dashboard\/projects\/(.+)$/);
+            const projectId = match?.[1];
+            navigate(projectId ? `/dashboard/generate?projectId=${encodeURIComponent(projectId)}` : "/dashboard/generate");
+          }}
         >
           <Plus className="h-4 w-4 shrink-0" />
           <AnimatePresence>

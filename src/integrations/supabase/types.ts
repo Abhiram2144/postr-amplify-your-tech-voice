@@ -21,13 +21,17 @@ export type Database = {
           content: string | null
           content_type: string | null
           created_at: string | null
+          generation_id: string
+          generation_source: string
           id: string
           improved_content: string | null
           input_type: string | null
+          last_rewritten_at: string | null
           original_input: string | null
           platform: string | null
           project_id: string | null
           rewrite_count: number | null
+          rewrite_limit: number | null
           updated_at: string | null
         }
         Insert: {
@@ -36,13 +40,17 @@ export type Database = {
           content?: string | null
           content_type?: string | null
           created_at?: string | null
+          generation_id?: string
+          generation_source?: string
           id?: string
           improved_content?: string | null
           input_type?: string | null
+          last_rewritten_at?: string | null
           original_input?: string | null
           platform?: string | null
           project_id?: string | null
           rewrite_count?: number | null
+          rewrite_limit?: number | null
           updated_at?: string | null
         }
         Update: {
@@ -51,13 +59,17 @@ export type Database = {
           content?: string | null
           content_type?: string | null
           created_at?: string | null
+          generation_id?: string
+          generation_source?: string
           id?: string
           improved_content?: string | null
           input_type?: string | null
+          last_rewritten_at?: string | null
           original_input?: string | null
           platform?: string | null
           project_id?: string | null
           rewrite_count?: number | null
+          rewrite_limit?: number | null
           updated_at?: string | null
         }
         Relationships: [
@@ -72,6 +84,7 @@ export type Database = {
       }
       project_notes: {
         Row: {
+          content_output_id: string | null
           created_at: string | null
           id: string
           project_id: string
@@ -79,6 +92,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          content_output_id?: string | null
           created_at?: string | null
           id?: string
           project_id: string
@@ -86,6 +100,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          content_output_id?: string | null
           created_at?: string | null
           id?: string
           project_id?: string
@@ -98,6 +113,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_notes_content_output_id_fkey"
+            columns: ["content_output_id"]
+            isOneToOne: false
+            referencedRelation: "content_outputs"
             referencedColumns: ["id"]
           },
         ]

@@ -1,0 +1,19 @@
+name: Reset Monthly Usage
+on:
+  schedule:
+    # Run at 00:01 UTC on the 1st of every month
+    - cron: '1 0 1 * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  reset-usage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call reset-monthly-usage edge function
+        run: |
+          curl -X POST "${{ secrets.SUPABASE_FUNCTION_URL }}/reset-monthly-usage" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET_KEY }}" \
+            -H "Content-Type: application/json"
+        env:
+          SUPABASE_FUNCTION_URL: ${{ secrets.SUPABASE_FUNCTION_URL }}
+          CRON_SECRET_KEY: ${{ secrets.CRON_SECRET_KEY }}

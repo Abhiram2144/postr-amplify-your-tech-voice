@@ -13,6 +13,7 @@ import {
 import type { UserProfile } from "@/components/dashboard/DashboardLayout";
 import { STRIPE_PLANS, PlanType } from "@/lib/stripe-config";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useCredits } from "@/hooks/useCredits";
 
 interface DashboardContext {
   profile: UserProfile | null;
@@ -35,6 +36,7 @@ const UsagePage = () => {
   const { profile } = useOutletContext<DashboardContext>();
   const navigate = useNavigate();
   const { plan: subscriptionPlan } = useSubscription();
+  const { creditsUsed, creditsLimit, creditsRemaining, loading: creditsLoading } = useCredits();
 
   const normalizePlan = (value?: string | null): PlanType => {
     const normalized = (value ?? "").toLowerCase();
@@ -50,32 +52,26 @@ const UsagePage = () => {
   const generationsLimit = planConfig.limits.ideasPerMonth;
   const videosLimit = planConfig.limits.videosPerMonth;
 
-  // Cap remaining values to not exceed plan limits
-  const generationsRemaining = 
-    typeof generationsLimit === "number"
-      ? Math.min(profile?.monthly_generation_limit ?? generationsLimit, generationsLimit)
-      : profile?.monthly_generation_limit ?? null;
-  const videosRemaining = 
-    typeof videosLimit === "number"
-      ? Math.min(profile?.monthly_video_limit ?? videosLimit, videosLimit)
-      : profile?.monthly_video_limit ?? null;
-  
-  const generationsUsed = typeof generationsLimit === "number"
-    ? generationsLimit - (generationsRemaining ?? generationsLimit)
-    : profile?.generations_used_this_month ?? 0;
-  const videosUsed = typeof videosLimit === "number"
-    ? videosLimit - (videosRemaining ?? videosLimit)
-    : 0;
+  const effectiveTextLimit = typeof generationsLimit === "number" ? creditsLimit : creditsLimit;
+  const effectiveTextUsed = creditsLoading ? 0 : creditsUsed;
+  const effectiveTextRemaining = creditsLoading ? 0 : creditsRemaining;
+
+  const generationsUsed = effectiveTextUsed;
+  const generationsLeftLabel = generationsLimit === "unlimited" ? "Unlimited" : effectiveTextRemaining;
+
+  const effectiveVideoLimit = typeof videosLimit === "number" ? videosLimit : (profile?.monthly_video_limit ?? 0);
+  const videosUsed = 0;
+  const videosLeftLabel = videosLimit === "unlimited" ? "Unlimited" : (profile?.monthly_video_limit ?? effectiveVideoLimit);
 
   const clampPercent = (value: number) => Math.min(100, Math.max(0, value));
   const generationsPercent =
-    typeof generationsLimit === "number" ? clampPercent((generationsUsed / generationsLimit) * 100) : 100;
+    typeof generationsLimit === "number" && effectiveTextLimit > 0 ? clampPercent((generationsUsed / effectiveTextLimit) * 100) : 100;
   const videosPercent =
-    typeof videosLimit === "number" ? clampPercent((videosUsed / videosLimit) * 100) : 100;
+    typeof videosLimit === "number" && effectiveVideoLimit > 0 ? clampPercent((videosUsed / effectiveVideoLimit) * 100) : 100;
 
   const formatLimit = (value: number | "unlimited") => (value === "unlimited" ? "Unlimited" : value);
-  const generationsLeftLabel = generationsLimit === "unlimited" ? "Unlimited" : generationsRemaining ?? generationsLimit;
-  const videosLeftLabel = videosLimit === "unlimited" ? "Unlimited" : videosRemaining ?? videosLimit;
+  const generationsLimitLabel = generationsLimit === "unlimited" ? formatLimit(generationsLimit) : effectiveTextLimit;
+  const videosLimitLabel = videosLimit === "unlimited" ? formatLimit(videosLimit) : effectiveVideoLimit;
 
   const planStyles = {
     free: {
@@ -172,7 +168,7 @@ const UsagePage = () => {
               <div className="flex justify-between items-end">
                 <div>
                   <p className="text-3xl font-bold text-foreground">{generationsUsed}</p>
-                  <p className="text-sm text-muted-foreground">of {formatLimit(generationsLimit)} used this month</p>
+                  <p className="text-sm text-muted-foreground">of {generationsLimitLabel} used this month</p>
                 </div>
                 <p className="text-lg font-medium text-primary">
                   {generationsLeftLabel} left
@@ -182,7 +178,7 @@ const UsagePage = () => {
                 <Progress value={generationsPercent} className="h-3" />
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>0</span>
-                  <span>{formatLimit(generationsLimit)}</span>
+                  <span>{generationsLimitLabel}</span>
                 </div>
               </div>
             </CardContent>
@@ -199,7 +195,7 @@ const UsagePage = () => {
               <div className="flex justify-between items-end">
                 <div>
                   <p className="text-3xl font-bold text-foreground">{videosUsed}</p>
-                  <p className="text-sm text-muted-foreground">of {formatLimit(videosLimit)} used this month</p>
+                  <p className="text-sm text-muted-foreground">of {videosLimitLabel} used this month</p>
                 </div>
                 <p className="text-lg font-medium text-accent">
                   {videosLeftLabel} left
@@ -209,7 +205,7 @@ const UsagePage = () => {
                 <Progress value={videosPercent} className="h-3 [&>div]:bg-accent" />
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>0</span>
-                  <span>{formatLimit(videosLimit)}</span>
+                  <span>{videosLimitLabel}</span>
                 </div>
               </div>
             </CardContent>
