@@ -72,8 +72,8 @@ const DashboardOverview = () => {
   const effectivePlan = subscriptionPlan !== "free" ? subscriptionPlan : profilePlan;
 
   const planConfig = STRIPE_PLANS[effectivePlan];
-  const generationsTotal = planConfig.limits.ideasPerMonth;
-  const videosTotal = planConfig.limits.videosPerMonth;
+  const generationsTotal = planConfig.limits.ideasPerMonth as number | "unlimited";
+  const videosTotal = planConfig.limits.videosPerMonth as number | "unlimited";
 
   const formatLimit = (value: number | "unlimited") => (value === "unlimited" ? "Unlimited" : value);
 

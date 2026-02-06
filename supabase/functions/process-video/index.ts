@@ -63,7 +63,7 @@ So my advice? Learn to use these tools, but don't lose what makes you unique in 
     )
   } catch (error) {
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error instanceof Error ? error.message : "An unexpected error occurred" }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
