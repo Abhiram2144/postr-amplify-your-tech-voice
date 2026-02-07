@@ -189,6 +189,44 @@ type GenerateResponse = {
   };
 };
 
+// YouTube Shorts context types
+interface VideoContext {
+  source_platform: "youtube_shorts";
+  video_id: string;
+  video_title: string;
+  video_description: string;
+  hashtags: string[];
+  transcript: string;
+  video_length_seconds: number;
+  channel_name: string;
+  view_count: number;
+  published_at: string;
+}
+
+interface VideoIntent {
+  intent: "educate" | "explain" | "inspire" | "sell" | "entertain";
+  target_audience: string;
+  tone: "educational" | "casual" | "bold" | "story-driven";
+  core_message: string;
+  key_takeaways: string[];
+}
+
+interface VideoProcessingResult {
+  context: VideoContext;
+  intent: VideoIntent;
+  metadata: {
+    videoId: string;
+    title: string;
+    channel: string;
+    duration: number;
+    views: number;
+    transcriptLength: number;
+    transcriptConfidence: number;
+  };
+}
+
+type VideoProcessingStep = "idle" | "validating" | "fetching_metadata" | "transcribing" | "analyzing" | "generating" | "complete" | "error";
+
 const GeneratePage = () => {
   const { profile } = useOutletContext<DashboardContext>();
   const { user, session } = useAuth();
@@ -227,6 +265,10 @@ const GeneratePage = () => {
   const [videoUrl, setVideoUrl] = useState("");
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoInputMethod, setVideoInputMethod] = useState<"url" | "upload">("url");
+  const [videoProcessingStep, setVideoProcessingStep] = useState<VideoProcessingStep>("idle");
+  const [videoContext, setVideoContext] = useState<VideoContext | null>(null);
+  const [videoIntent, setVideoIntent] = useState<VideoIntent | null>(null);
+  const [videoMetadata, setVideoMetadata] = useState<VideoProcessingResult["metadata"] | null>(null);
   
   // Platforms come from user profile (set during onboarding or in settings) - not selectable here
   const userPlatforms = profile?.platforms || ["linkedin", "twitter"];
@@ -347,8 +389,8 @@ const GeneratePage = () => {
       return;
     }
 
-    // Testing mode or video mode uses mock data
-    if (testingMode || creationMode === "video") {
+    // Testing mode uses mock data
+    if (testingMode) {
       setIsProcessing(true);
       setTimeout(() => {
         addOutputVariant({ analysis: MOCK_VIDEO_ANALYSIS.analysis, outputs: MOCK_VIDEO_ANALYSIS.outputs }, append);
@@ -366,6 +408,13 @@ const GeneratePage = () => {
       return;
     }
 
+    // Real video mode - YouTube Shorts Intelligence
+    if (creationMode === "video" && !testingMode) {
+      await handleVideoGeneration(append);
+      return;
+    }
+
+    // Real text-based generation
     setIsProcessing(true);
 
     try {
@@ -398,11 +447,8 @@ const GeneratePage = () => {
         };
       })();
 
-      // Don't auto-persist - user will click "Save to Project" button
-      // Just add to output variants for comparison
       addOutputVariant({ analysis: generated.analysis, outputs: generated.outputs }, append);
       
-      // Update credits in hook (only if not in testing mode)
       if (!testingMode && generated.credits?.used !== undefined) {
         updateCreditsAfterGeneration(generated.credits.used);
       }
@@ -433,6 +479,111 @@ const GeneratePage = () => {
       });
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  // YouTube Shorts Intelligence Mode handler
+  const handleVideoGeneration = async (append = false) => {
+    if (!videoUrl || !isValidVideoUrl(videoUrl)) {
+      toast({
+        title: "Invalid URL",
+        description: "Please enter a valid YouTube Shorts URL",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+    setVideoProcessingStep("validating");
+
+    try {
+      // Step 1: Process video - fetch metadata and transcription
+      setVideoProcessingStep("fetching_metadata");
+      
+      const { data: videoData, error: videoError } = await supabase.functions.invoke("process-youtube-shorts", {
+        body: { videoUrl },
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+      });
+
+      if (videoError) throw videoError;
+      if (videoData.error) throw new Error(videoData.error);
+
+      setVideoProcessingStep("transcribing");
+      
+      // Store the video context and intent
+      const processedContext = videoData.context as VideoContext;
+      const processedIntent = videoData.intent as VideoIntent;
+      const processedMetadata = videoData.metadata as VideoProcessingResult["metadata"];
+      
+      setVideoContext(processedContext);
+      setVideoIntent(processedIntent);
+      setVideoMetadata(processedMetadata);
+
+      setVideoProcessingStep("generating");
+
+      // Step 2: Generate content using enriched context
+      const { data: genData, error: genError } = await supabase.functions.invoke("generate-content", {
+        body: {
+          mode: "video",
+          platforms: userPlatforms,
+          video_context: processedContext,
+          video_intent: processedIntent,
+        },
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+      });
+
+      if (genError) throw genError;
+      if (genData.error === "insufficient_credits") {
+        setShowCreditsModal(true);
+        throw new Error("insufficient_credits");
+      }
+      if (genData.error) throw new Error(genData.error);
+
+      setVideoProcessingStep("complete");
+
+      addOutputVariant({ 
+        analysis: genData.analysis as AnalysisResult, 
+        outputs: genData.outputs as PlatformOutput[] 
+      }, append);
+      
+      if (genData.credits?.used !== undefined) {
+        updateCreditsAfterGeneration(genData.credits.used);
+      }
+
+      if (append) {
+        setHasGeneratedAnother(true);
+      }
+      
+      setCurrentStep(append ? 4 : 2);
+      
+      toast({
+        title: append ? "Another version generated" : "Video Analyzed & Content Generated!",
+        description: append
+          ? "Select your preferred version per platform, then save."
+          : `Analyzed "${processedMetadata.title}" (${processedMetadata.duration}s). ${genData.credits?.remaining ?? creditsRemaining - 1} credits remaining.`,
+      });
+
+    } catch (error) {
+      console.error("Video generation error:", error);
+      setVideoProcessingStep("error");
+
+      if (error instanceof Error && error.message === "insufficient_credits") {
+        return;
+      }
+
+      toast({
+        title: "Video Processing Failed",
+        description: error instanceof Error ? error.message : "Could not process the video. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+      // Reset step after a delay
+      setTimeout(() => setVideoProcessingStep("idle"), 3000);
     }
   };
 
@@ -772,122 +923,131 @@ const GeneratePage = () => {
 
                   {creationMode === "video" && (
                     <div className="space-y-4">
-                      {/* Input method toggle */}
-                      <div className="flex gap-2 p-1 bg-muted rounded-lg">
-                        <Button
-                          type="button"
-                          variant={videoInputMethod === "url" ? "default" : "ghost"}
-                          size="sm"
-                          className="flex-1"
-                          onClick={() => setVideoInputMethod("url")}
-                        >
-                          Paste Link
-                        </Button>
-                        <Button
-                          type="button"
-                          variant={videoInputMethod === "upload" ? "default" : "ghost"}
-                          size="sm"
-                          className="flex-1"
-                          onClick={() => setVideoInputMethod("upload")}
-                        >
-                          Upload File
-                        </Button>
-                      </div>
-
-                      {/* URL Input */}
-                      {videoInputMethod === "url" && (
-                        <div className="space-y-2">
-                          <Label htmlFor="videoUrl">Video URL</Label>
-                          <Input
-                            id="videoUrl"
-                            type="url"
-                            placeholder="Paste YouTube Shorts, TikTok, or Instagram video link"
-                            value={videoUrl}
-                            onChange={(e) => setVideoUrl(e.target.value)}
-                          />
-                          {videoUrl && isValidVideoUrl(videoUrl) && (
-                            <div className="flex items-center gap-2 text-sm text-green-600">
-                              <Check className="h-4 w-4" />
-                              <span>Valid {getPlatformDisplayName(detectVideoPlatform(videoUrl))} video detected</span>
-                            </div>
-                          )}
-                          {videoUrl && !isValidVideoUrl(videoUrl) && (
-                            <p className="text-sm text-destructive">
-                              Invalid URL. Please paste a YouTube Shorts, TikTok, or Instagram Reels link.
+                      {/* YouTube Shorts Only Notice */}
+                      <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+                        <div className="flex items-start gap-2">
+                          <Sparkles className="h-5 w-5 text-primary mt-0.5" />
+                          <div>
+                            <p className="font-medium text-sm text-foreground">YouTube Shorts Intelligence Mode</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Paste a YouTube Shorts URL to extract transcript, analyze creator intent, and generate platform-native content.
                             </p>
-                          )}
-                          <p className="text-xs text-muted-foreground">
-                            Supported: YouTube Shorts, TikTok, Instagram Reels
-                          </p>
-                        </div>
-                      )}
-
-                      {/* File Upload */}
-                      {videoInputMethod === "upload" && (
-                        <div className="space-y-2">
-                          <Label htmlFor="videoFile">Upload Video File</Label>
-                          <div className="border-2 border-dashed border-muted-foreground/30 rounded-xl p-8 text-center bg-muted/20 relative overflow-hidden hover:border-primary/50 transition-colors">
-                            <input
-                              id="videoFile"
-                              type="file"
-                              accept="video/mp4,video/mov,video/webm,video/quicktime"
-                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                  const validation = isValidVideoFile(file);
-                                  if (!validation.valid) {
-                                    toast({
-                                      title: "Invalid file",
-                                      description: validation.error,
-                                      variant: "destructive",
-                                    });
-                                    e.target.value = "";
-                                    return;
-                                  }
-                                  setVideoFile(file);
-                                }
-                              }}
-                            />
-                            <div className="relative z-0 flex flex-col items-center gap-3">
-                              <div className="h-12 w-12 rounded-xl bg-background border border-muted flex items-center justify-center">
-                                <Video className="h-6 w-6 text-muted-foreground" />
-                              </div>
-                              {videoFile ? (
-                                <div>
-                                  <p className="font-medium text-foreground">{videoFile.name}</p>
-                                  <p className="text-sm text-muted-foreground">
-                                    {(videoFile.size / 1024 / 1024).toFixed(2)} MB
-                                  </p>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    className="mt-2"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setVideoFile(null);
-                                      // Reset the input
-                                      const input = document.getElementById("videoFile") as HTMLInputElement;
-                                      if (input) input.value = "";
-                                    }}
-                                  >
-                                    Remove
-                                  </Button>
-                                </div>
-                              ) : (
-                                <div>
-                                  <p className="font-medium text-foreground">Drop your video here</p>
-                                  <p className="text-sm text-muted-foreground">or click to browse</p>
-                                  <p className="text-xs text-muted-foreground mt-2">
-                                    MP4, MOV, WebM (max 100MB)
-                                  </p>
-                                </div>
-                              )}
-                            </div>
                           </div>
                         </div>
+                      </div>
+
+                      {/* URL Input (YouTube Shorts only for now) */}
+                      <div className="space-y-2">
+                        <Label htmlFor="videoUrl">YouTube Shorts URL</Label>
+                        <Input
+                          id="videoUrl"
+                          type="url"
+                          placeholder="https://youtube.com/shorts/..."
+                          value={videoUrl}
+                          onChange={(e) => setVideoUrl(e.target.value)}
+                          disabled={isProcessing}
+                        />
+                        {videoUrl && isValidVideoUrl(videoUrl) && detectVideoPlatform(videoUrl) === "youtube" && (
+                          <div className="flex items-center gap-2 text-sm text-green-600">
+                            <Check className="h-4 w-4" />
+                            <span>Valid YouTube Shorts URL detected</span>
+                          </div>
+                        )}
+                        {videoUrl && isValidVideoUrl(videoUrl) && detectVideoPlatform(videoUrl) !== "youtube" && (
+                          <div className="flex items-center gap-2 text-sm text-amber-600">
+                            <AlertCircle className="h-4 w-4" />
+                            <span>{getPlatformDisplayName(detectVideoPlatform(videoUrl))} detected - only YouTube Shorts supported currently</span>
+                          </div>
+                        )}
+                        {videoUrl && !isValidVideoUrl(videoUrl) && (
+                          <p className="text-sm text-destructive">
+                            Invalid URL. Please paste a valid YouTube Shorts link.
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          Supported: YouTube Shorts (youtube.com/shorts/... or youtu.be/...)
+                        </p>
+                      </div>
+
+                      {/* Processing Status */}
+                      {isProcessing && videoProcessingStep !== "idle" && (
+                        <div className="rounded-lg border bg-muted/50 p-4 space-y-3">
+                          <div className="flex items-center gap-3">
+                            <motion.div
+                              animate={{ rotate: 360 }}
+                              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                            >
+                              <Sparkles className="h-5 w-5 text-primary" />
+                            </motion.div>
+                            <div className="flex-1">
+                              <p className="font-medium text-sm">
+                                {videoProcessingStep === "validating" && "Validating video URL..."}
+                                {videoProcessingStep === "fetching_metadata" && "Fetching video metadata..."}
+                                {videoProcessingStep === "transcribing" && "Transcribing audio (this may take a minute)..."}
+                                {videoProcessingStep === "analyzing" && "Analyzing creator intent..."}
+                                {videoProcessingStep === "generating" && "Generating platform content..."}
+                                {videoProcessingStep === "complete" && "Complete!"}
+                                {videoProcessingStep === "error" && "Processing failed"}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {videoProcessingStep === "transcribing" 
+                                  ? "AssemblyAI is transcribing the spoken content"
+                                  : videoProcessingStep === "generating"
+                                  ? "Creating high-quality, platform-native content"
+                                  : "Please wait..."
+                                }
+                              </p>
+                            </div>
+                          </div>
+                          <Progress 
+                            value={
+                              videoProcessingStep === "validating" ? 10 :
+                              videoProcessingStep === "fetching_metadata" ? 25 :
+                              videoProcessingStep === "transcribing" ? 50 :
+                              videoProcessingStep === "analyzing" ? 75 :
+                              videoProcessingStep === "generating" ? 90 :
+                              videoProcessingStep === "complete" ? 100 : 0
+                            } 
+                            className="h-2"
+                          />
+                        </div>
                       )}
+
+                      {/* Video Metadata Preview (after processing) */}
+                      {videoMetadata && videoContext && (
+                        <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+                          <div className="flex items-start gap-3">
+                            <div className="h-10 w-10 rounded-lg bg-red-100 flex items-center justify-center text-red-600">
+                              <Video className="h-5 w-5" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate">{videoMetadata.title}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {videoMetadata.channel} • {videoMetadata.duration}s • {videoMetadata.views.toLocaleString()} views
+                              </p>
+                            </div>
+                          </div>
+                          {videoIntent && (
+                            <div className="flex flex-wrap gap-2 pt-2 border-t">
+                              <Badge variant="secondary" className="text-xs">
+                                Intent: {videoIntent.intent}
+                              </Badge>
+                              <Badge variant="secondary" className="text-xs">
+                                Tone: {videoIntent.tone}
+                              </Badge>
+                              <Badge variant="outline" className="text-xs">
+                                {videoMetadata.transcriptLength} chars transcribed
+                              </Badge>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Disabled file upload notice */}
+                      <div className="text-xs text-muted-foreground flex items-center gap-2 pt-2">
+                        <Lock className="h-3 w-3" />
+                        <span>File upload coming soon. Currently supporting YouTube Shorts URLs only.</span>
+                      </div>
                     </div>
                   )}
 

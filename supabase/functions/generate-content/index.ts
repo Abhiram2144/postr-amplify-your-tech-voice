@@ -96,7 +96,7 @@ const getSafeErrorMessage = (error: unknown): string => {
 
 // Input validation schema
 const generateContentSchema = z.object({
-  mode: z.enum(["brief_topic", "script"]),
+  mode: z.enum(["brief_topic", "script", "video"]),
   topic: z.string().max(500, "Topic too long").optional(),
   audience: z.string().max(200, "Audience description too long").optional(),
   intent: z.string().max(200, "Intent too long").optional(),
@@ -105,6 +105,26 @@ const generateContentSchema = z.object({
   platforms: z.array(
     z.string().max(50)
   ).min(1, "At least one platform must be selected").max(6, "Maximum 6 platforms allowed"),
+  // Video mode enriched context
+  video_context: z.object({
+    source_platform: z.literal("youtube_shorts"),
+    video_id: z.string(),
+    video_title: z.string(),
+    video_description: z.string(),
+    hashtags: z.array(z.string()),
+    transcript: z.string(),
+    video_length_seconds: z.number(),
+    channel_name: z.string(),
+    view_count: z.number(),
+    published_at: z.string(),
+  }).optional(),
+  video_intent: z.object({
+    intent: z.enum(["educate", "explain", "inspire", "sell", "entertain"]),
+    target_audience: z.string(),
+    tone: z.enum(["educational", "casual", "bold", "story-driven"]),
+    core_message: z.string(),
+    key_takeaways: z.array(z.string()),
+  }).optional(),
 }).refine(
   (data) => {
     if (data.mode === "brief_topic") {
@@ -113,9 +133,12 @@ const generateContentSchema = z.object({
     if (data.mode === "script") {
       return !!data.script_text && data.script_text.length >= 50;
     }
+    if (data.mode === "video") {
+      return !!data.video_context && !!data.video_intent && data.video_context.transcript.length > 0;
+    }
     return false;
   },
-  { message: "Topic required for brief_topic mode, script_text (min 50 chars) required for script mode" }
+  { message: "Topic required for brief_topic, script_text for script, or video_context + video_intent for video mode" }
 );
 
 // Platform-specific formatting instructions
@@ -185,7 +208,7 @@ serve(async (req) => {
       );
     }
     
-    const { mode, topic, audience, intent, tone, script_text, platforms } = validation.data;
+    const { mode, topic, audience, intent, tone, script_text, platforms, video_context, video_intent } = validation.data;
     logStep("Request validated", { mode, platformCount: platforms.length });
 
     // Get user plan and usage
@@ -262,6 +285,42 @@ Tone: ${tone || "Casual"}
 
 First, analyze what would make compelling content about this topic for the target audience.
 Then create platform-specific versions that feel native to each platform.
+`;
+    } else if (mode === "video" && video_context && video_intent) {
+      // YouTube Shorts Intelligence Mode - enriched context generation
+      contentPrompt = `
+You are a senior content strategist who transforms video content into platform-native posts.
+You think deeply before writing. You never generate generic content.
+
+=== VIDEO SOURCE CONTEXT ===
+Platform: YouTube Shorts
+Title: ${video_context.video_title}
+Channel: ${video_context.channel_name}
+Duration: ${video_context.video_length_seconds} seconds
+Views: ${video_context.view_count.toLocaleString()}
+
+=== FULL TRANSCRIPT ===
+${video_context.transcript}
+
+=== INFERRED CREATOR INTENT ===
+Primary Intent: ${video_intent.intent}
+Target Audience: ${video_intent.target_audience}
+Tone: ${video_intent.tone}
+Core Message: ${video_intent.core_message}
+
+Key Takeaways:
+${video_intent.key_takeaways.map((t, i) => `${i + 1}. ${t}`).join("\n")}
+
+=== YOUR MISSION ===
+1. Preserve the original creator's THINKING, not just their words
+2. Improve clarity, structure, and impact WITHOUT changing the core meaning
+3. Optimize for insight density, not length - every sentence must earn its place
+4. Make the output feel like it was written by a thoughtful human creator
+5. Do NOT paraphrase blindly or generate fluffy content
+6. Do NOT explain obvious things or sound like an AI assistant
+
+Analyze the content for clarity, hook strength, engagement potential, and structure.
+Then create platform-specific versions that are sharper and more valuable than generic rewrites.
 `;
     } else {
       contentPrompt = `
