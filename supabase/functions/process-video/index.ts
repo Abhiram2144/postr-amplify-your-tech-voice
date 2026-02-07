@@ -1,14 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { getCorsHeaders, handleCorsOptions } from "../_shared/cors.ts"
 
 serve(async (req) => {
+  const origin = req.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin);
+
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return handleCorsOptions(origin);
   }
 
   try {
@@ -19,18 +18,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
-
-    // TODO: Implement video processing logic
-    // This is a placeholder for the actual video processing
-    // You would need to:
-    // 1. Download video from URL or process uploaded file
-    // 2. Extract audio
-    // 3. Transcribe audio using a service like:
-    //    - OpenAI Whisper API
-    //    - Google Speech-to-Text
-    //    - AssemblyAI
-    //    - Deepgram
-    // 4. Return transcript and metadata
 
     // For now, return a mock response
     console.log('Processing video:', { videoUrl, videoFile, userId })
@@ -62,10 +49,11 @@ So my advice? Learn to use these tools, but don't lose what makes you unique in 
       }
     )
   } catch (error) {
+    const origin = req.headers.get("origin");
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "An unexpected error occurred" }),
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...getCorsHeaders(origin), 'Content-Type': 'application/json' },
         status: 400,
       }
     )
