@@ -133,21 +133,31 @@ serve(async (req) => {
 
     if (hasActiveSub) {
       const subscription = subscriptions.data[0];
-      subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
+      
+      // Safely parse current_period_end
+      const periodEnd = subscription.current_period_end;
+      if (periodEnd && !isNaN(periodEnd)) {
+        subscriptionEnd = new Date(periodEnd * 1000).toISOString();
+      }
+      
       subscriptionId = subscription.id;
       const productId = subscription.items.data[0].price.product as string;
       plan = PLAN_MAPPING[productId] || "free";
       
       // Check if subscription is set to cancel at period end
-      if (subscription.cancel_at_period_end) {
+      if (subscription.cancel_at_period_end && subscriptionEnd) {
         cancellingAt = subscriptionEnd;
         logStep("Subscription set to cancel", { cancellingAt });
       }
       
-      // Get subscription start date safely (handle cases where it might not exist)
-      const startDate = subscription.start_date 
-        ? new Date(subscription.start_date * 1000).toISOString()
-        : new Date().toISOString();
+      // Get subscription start date safely - use created timestamp if start_date missing
+      let startDate: string;
+      const startTimestamp = subscription.start_date || subscription.created;
+      if (startTimestamp && !isNaN(startTimestamp)) {
+        startDate = new Date(startTimestamp * 1000).toISOString();
+      } else {
+        startDate = new Date().toISOString();
+      }
       
       logStep("Active subscription found", { plan, endDate: subscriptionEnd, cancellingAt });
 
