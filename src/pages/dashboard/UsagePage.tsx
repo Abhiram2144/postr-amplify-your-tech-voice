@@ -49,8 +49,8 @@ const UsagePage = () => {
   const effectivePlan = subscriptionPlan !== "free" ? subscriptionPlan : profilePlan;
   const planConfig = STRIPE_PLANS[effectivePlan];
 
-  const generationsLimit = planConfig.limits.ideasPerMonth;
-  const videosLimit = planConfig.limits.videosPerMonth;
+  const generationsLimit = planConfig.limits.ideasPerMonth as number | "unlimited";
+  const videosLimit = planConfig.limits.videosPerMonth as number | "unlimited";
 
   const effectiveTextLimit = typeof generationsLimit === "number" ? creditsLimit : creditsLimit;
   const effectiveTextUsed = creditsLoading ? 0 : creditsUsed;

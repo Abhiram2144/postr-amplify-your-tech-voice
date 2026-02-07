@@ -6,6 +6,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 const ALLOWED_ORIGINS = [
   "https://postr-genius.lovable.app",
   "https://id-preview--4a84c60f-1875-4a85-aaf4-0085811561d6.lovable.app",
+  "https://postr-one.vercel.app",
   "http://localhost:5173",
   "http://localhost:3000",
   "http://localhost:8080",
