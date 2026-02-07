@@ -31,6 +31,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { getSafeErrorMessage } from "@/lib/errors";
 import { STRIPE_PLANS, PlanType } from "@/lib/stripe-config";
+import { EmbeddedCheckoutModal } from "@/components/checkout/EmbeddedCheckoutModal";
 import type { UserProfile } from "@/components/dashboard/DashboardLayout";
 
 interface DashboardContext {
@@ -63,15 +64,27 @@ const platformLimitForPlan = (effectivePlan: PlanType) => {
 
 // My Plan Tab Component
 const MyPlanTabContent = ({ profile }: { profile: UserProfile | null }) => {
-  const { plan: subscriptionPlan, subscribed, subscriptionEnd, openCustomerPortal, openCheckout, loading } = useSubscription();
+  const { 
+    plan: subscriptionPlan, 
+    subscribed, 
+    subscriptionEnd, 
+    cancellingAt,
+    openCustomerPortal, 
+    cancelSubscription,
+    checkSubscription,
+    loading 
+  } = useSubscription();
   const { toast } = useToast();
   const [loadingPortal, setLoadingPortal] = useState(false);
-  const [loadingCheckout, setLoadingCheckout] = useState<string | null>(null);
+  const [loadingCancel, setLoadingCancel] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [selectedPriceId, setSelectedPriceId] = useState<string | null>(null);
 
   const profilePlan = normalizePlan(profile?.plan);
   const effectivePlan = subscriptionPlan !== "free" ? subscriptionPlan : profilePlan;
   const isPaidPlan = effectivePlan !== "free";
+  const isCancelling = !!cancellingAt;
 
   const handleManageSubscription = async () => {
     setLoadingPortal(true);
@@ -89,38 +102,40 @@ const MyPlanTabContent = ({ profile }: { profile: UserProfile | null }) => {
   };
 
   const handleCancelSubscription = async () => {
-    setLoadingPortal(true);
+    setLoadingCancel(true);
     try {
-      await openCustomerPortal();
+      const result = await cancelSubscription();
+      if (result.success) {
+        toast({
+          title: "Subscription cancelled",
+          description: `Your subscription will end on ${new Date(result.cancelsAt!).toLocaleDateString()}. You'll keep access until then.`,
+        });
+        setShowCancelDialog(false);
+      }
     } catch (error) {
       toast({
-        title: "Error",
+        title: "Cancellation failed",
         description: getSafeErrorMessage(error),
         variant: "destructive",
       });
     } finally {
-      setLoadingPortal(false);
+      setLoadingCancel(false);
     }
   };
 
-  const handleConfirmCancel = async () => {
-    setShowCancelDialog(false);
-    await handleCancelSubscription();
+  const handleUpgrade = (priceId: string) => {
+    setSelectedPriceId(priceId);
+    setShowCheckoutModal(true);
   };
 
-  const handleUpgrade = async (priceId: string, planName: string) => {
-    setLoadingCheckout(planName);
-    try {
-      await openCheckout(priceId);
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: getSafeErrorMessage(error),
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingCheckout(null);
-    }
+  const handleCheckoutSuccess = () => {
+    setShowCheckoutModal(false);
+    setSelectedPriceId(null);
+    checkSubscription();
+    toast({
+      title: "Subscription activated!",
+      description: "Welcome to your new plan. Enjoy the upgraded features!",
+    });
   };
 
   const getPlanStyles = (planType: PlanType) => {
@@ -259,14 +274,10 @@ const MyPlanTabContent = ({ profile }: { profile: UserProfile | null }) => {
                         variant={planOption.popular ? "hero" : "outline"}
                         size="sm"
                         className="w-full"
-                        onClick={() => handleUpgrade(planOption.priceId!, planOption.id)}
-                        disabled={loadingCheckout !== null}
+                        onClick={() => handleUpgrade(planOption.priceId!)}
+                        disabled={showCheckoutModal}
                       >
-                        {loadingCheckout === planOption.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          "Upgrade"
-                        )}
+                        Upgrade
                       </Button>
                     ) : isDowngrade && subscribed ? (
                       <Button
@@ -292,43 +303,82 @@ const MyPlanTabContent = ({ profile }: { profile: UserProfile | null }) => {
         <CardHeader>
           <CardTitle>Billing</CardTitle>
           <CardDescription>
-            {isPaidPlan
-              ? "Downgrade to free anytime from the customer portal"
+            {isCancelling
+              ? `Your subscription will end on ${new Date(cancellingAt!).toLocaleDateString()}`
+              : isPaidPlan
+              ? "Cancel your subscription anytime"
               : "You do not have an active subscription"}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col sm:flex-row gap-3">
-          <Button
-            variant="destructive"
-            onClick={() => setShowCancelDialog(true)}
-            disabled={!isPaidPlan || loadingPortal}
-            className="focus-visible:ring-0 focus-visible:ring-offset-0"
-          >
-            {loadingPortal ? "Opening..." : "Downgrade to free"}
-          </Button>
+          {!isCancelling && (
+            <Button
+              variant="destructive"
+              onClick={() => setShowCancelDialog(true)}
+              disabled={!isPaidPlan || loadingCancel}
+              className="focus-visible:ring-0 focus-visible:ring-offset-0"
+            >
+              Cancel subscription
+            </Button>
+          )}
+          {isPaidPlan && (
+            <Button
+              variant="outline"
+              onClick={handleManageSubscription}
+              disabled={loadingPortal}
+            >
+              {loadingPortal ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  Manage billing
+                  <ExternalLink className="h-3 w-3 ml-1" />
+                </>
+              )}
+            </Button>
+          )}
         </CardContent>
       </Card>
+
+      {/* Cancel Subscription Dialog */}
       <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Downgrade to free?</DialogTitle>
+            <DialogTitle>Cancel subscription?</DialogTitle>
             <DialogDescription>
-              You will keep access until the end of your current billing period. This will open Stripe so you can confirm the downgrade.
+              You will keep access until the end of your current billing period.
             </DialogDescription>
             <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-muted-foreground">
-              Downgrades may take effect immediately or at the period end depending on your Stripe settings.
+              Your subscription will remain active until {subscriptionEnd ? new Date(subscriptionEnd).toLocaleDateString() : "the end of your billing period"}.
             </div>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCancelDialog(false)}>
-              Keep current plan
+              Keep subscription
             </Button>
-            <Button variant="destructive" onClick={handleConfirmCancel}>
-              Continue to Stripe
+            <Button 
+              variant="destructive" 
+              onClick={handleCancelSubscription}
+              disabled={loadingCancel}
+            >
+              {loadingCancel ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
+              Cancel subscription
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Embedded Checkout Modal */}
+      {selectedPriceId && (
+        <EmbeddedCheckoutModal
+          open={showCheckoutModal}
+          onOpenChange={setShowCheckoutModal}
+          priceId={selectedPriceId}
+          onSuccess={handleCheckoutSuccess}
+        />
+      )}
     </motion.div>
   );
 };

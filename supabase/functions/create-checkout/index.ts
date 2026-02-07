@@ -38,6 +38,7 @@ const checkoutSchema = z.object({
     .max(100, "Price ID too long")
     .regex(/^price_[a-zA-Z0-9_]+$/, "Invalid price ID format"),
   billingCycle: z.enum(["monthly", "yearly"]).optional(),
+  embedded: z.boolean().optional(),
 });
 
 // Sanitize log values
@@ -104,8 +105,8 @@ serve(async (req) => {
       );
     }
     
-    const { priceId, billingCycle } = validation.data;
-    logStep("Request validated", { priceId, billingCycle });
+    const { priceId, billingCycle, embedded } = validation.data;
+    logStep("Request validated", { priceId, billingCycle, embedded });
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header provided");
@@ -133,7 +134,8 @@ serve(async (req) => {
       ? origin 
       : ALLOWED_ORIGINS[0];
     
-    const session = await stripe.checkout.sessions.create({
+    // Create session with embedded mode support
+    const sessionConfig: Stripe.Checkout.SessionCreateParams = {
       customer: customerId,
       customer_email: customerId ? undefined : user.email,
       line_items: [
@@ -143,14 +145,31 @@ serve(async (req) => {
         },
       ],
       mode: "subscription",
-      success_url: `${returnOrigin}/dashboard?checkout=success`,
-      cancel_url: `${returnOrigin}/pricing?checkout=canceled`,
       metadata: {
         user_id: user.id,
       },
-    });
+    };
 
-    logStep("Checkout session created", { sessionId: session.id });
+    // For embedded checkout, use ui_mode and return_url
+    if (embedded) {
+      sessionConfig.ui_mode = "embedded";
+      sessionConfig.return_url = `${returnOrigin}/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}`;
+    } else {
+      sessionConfig.success_url = `${returnOrigin}/dashboard?checkout=success`;
+      sessionConfig.cancel_url = `${returnOrigin}/pricing?checkout=canceled`;
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionConfig);
+
+    logStep("Checkout session created", { sessionId: session.id, embedded });
+
+    // Return client_secret for embedded mode, url for redirect mode
+    if (embedded && session.client_secret) {
+      return new Response(JSON.stringify({ clientSecret: session.client_secret }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
 
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

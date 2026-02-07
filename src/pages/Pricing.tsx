@@ -13,15 +13,18 @@ import { STRIPE_PLANS, type BillingCycle, type PlanType } from "@/lib/stripe-con
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
+import { EmbeddedCheckoutModal } from "@/components/checkout/EmbeddedCheckoutModal";
 
 const Pricing = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const { plan: subscriptionPlan, checkSubscription, openCheckout } = useSubscription();
+  const { plan: subscriptionPlan, checkSubscription } = useSubscription();
   const { toast } = useToast();
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [profilePlan, setProfilePlan] = useState<PlanType>("free");
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [selectedPriceId, setSelectedPriceId] = useState<string | null>(null);
 
   // Fetch user profile plan
   useEffect(() => {
@@ -164,21 +167,22 @@ const Pricing = () => {
       return;
     }
 
-    // Open Stripe checkout
+    // Open embedded Stripe checkout
     if (plan.priceId) {
-      setLoadingPlan(plan.key);
-      try {
-        await openCheckout(plan.priceId);
-      } catch (error) {
-        toast({
-          title: "Checkout failed",
-          description: getSafeErrorMessage(error),
-          variant: "destructive",
-        });
-      } finally {
-        setLoadingPlan(null);
-      }
+      setSelectedPriceId(plan.priceId);
+      setShowCheckoutModal(true);
     }
+  };
+
+  const handleCheckoutSuccess = () => {
+    setShowCheckoutModal(false);
+    setSelectedPriceId(null);
+    checkSubscription();
+    toast({
+      title: "Subscription activated!",
+      description: "Welcome to your new plan. Redirecting to dashboard...",
+    });
+    navigate("/dashboard?checkout=success");
   };
 
   return (
@@ -304,6 +308,16 @@ const Pricing = () => {
         </div>
       </main>
       <Footer />
+      
+      {/* Embedded Checkout Modal */}
+      {selectedPriceId && (
+        <EmbeddedCheckoutModal
+          open={showCheckoutModal}
+          onOpenChange={setShowCheckoutModal}
+          priceId={selectedPriceId}
+          onSuccess={handleCheckoutSuccess}
+        />
+      )}
     </div>
   );
 };

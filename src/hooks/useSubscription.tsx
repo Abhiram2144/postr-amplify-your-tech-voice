@@ -7,10 +7,13 @@ interface SubscriptionContextType {
   plan: PlanType;
   subscribed: boolean;
   subscriptionEnd: string | null;
+  cancellingAt: string | null;
   loading: boolean;
   checkSubscription: () => Promise<void>;
   openCheckout: (priceId: string) => Promise<void>;
+  openEmbeddedCheckout: (priceId: string) => Promise<string | null>;
   openCustomerPortal: () => Promise<void>;
+  cancelSubscription: () => Promise<{ success: boolean; cancelsAt?: string }>;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
@@ -20,6 +23,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   const [plan, setPlan] = useState<PlanType>("free");
   const [subscribed, setSubscribed] = useState(false);
   const [subscriptionEnd, setSubscriptionEnd] = useState<string | null>(null);
+  const [cancellingAt, setCancellingAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const checkSubscription = useCallback(async () => {
@@ -27,6 +31,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       setPlan("free");
       setSubscribed(false);
       setSubscriptionEnd(null);
+      setCancellingAt(null);
       setLoading(false);
       return;
     }
@@ -43,6 +48,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
       setPlan(data.plan || "free");
       setSubscribed(data.subscribed || false);
       setSubscriptionEnd(data.subscription_end || null);
+      setCancellingAt(data.cancelling_at || null);
     } catch (error) {
       console.error("Error checking subscription:", error);
       setPlan("free");
@@ -52,6 +58,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [session?.access_token]);
 
+  // Regular checkout (redirect to Stripe)
   const openCheckout = async (priceId: string) => {
     if (!session?.access_token) {
       throw new Error("Must be logged in to checkout");
@@ -70,6 +77,33 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // Embedded checkout - returns client secret for in-app checkout
+  const openEmbeddedCheckout = async (priceId: string): Promise<string | null> => {
+    if (!session?.access_token) {
+      throw new Error("Must be logged in to checkout");
+    }
+
+    const { data, error } = await supabase.functions.invoke("create-checkout", {
+      body: { priceId, embedded: true },
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+
+    if (error) throw error;
+    
+    if (data?.clientSecret) {
+      return data.clientSecret;
+    }
+    
+    // Fallback to redirect if embedded not supported
+    if (data?.url) {
+      window.location.href = data.url;
+    }
+    
+    return null;
+  };
+
   const openCustomerPortal = async () => {
     if (!session?.access_token) {
       throw new Error("Must be logged in to manage subscription");
@@ -85,6 +119,29 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     if (data?.url) {
       window.open(data.url, "_blank");
     }
+  };
+
+  const cancelSubscription = async (): Promise<{ success: boolean; cancelsAt?: string }> => {
+    if (!session?.access_token) {
+      throw new Error("Must be logged in to cancel subscription");
+    }
+
+    const { data, error } = await supabase.functions.invoke("cancel-subscription", {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+
+    if (error) throw error;
+    
+    if (data?.success) {
+      setCancellingAt(data.cancels_at);
+      // Refresh subscription data
+      await checkSubscription();
+      return { success: true, cancelsAt: data.cancels_at };
+    }
+    
+    throw new Error(data?.error || "Failed to cancel subscription");
   };
 
   useEffect(() => {
@@ -109,10 +166,13 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
         plan,
         subscribed,
         subscriptionEnd,
+        cancellingAt,
         loading,
         checkSubscription,
         openCheckout,
+        openEmbeddedCheckout,
         openCustomerPortal,
+        cancelSubscription,
       }}
     >
       {children}
