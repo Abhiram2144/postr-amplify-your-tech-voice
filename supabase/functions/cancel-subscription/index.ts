@@ -101,15 +101,25 @@ serve(async (req) => {
       { cancel_at_period_end: true }
     );
 
+    // Safely convert unix timestamp to ISO string
+    const periodEndTimestamp = subscription.current_period_end;
+    let periodEndDate: string;
+    
+    if (periodEndTimestamp && !isNaN(periodEndTimestamp)) {
+      periodEndDate = new Date(periodEndTimestamp * 1000).toISOString();
+    } else {
+      // Fallback: set expiry to 30 days from now if timestamp is invalid
+      periodEndDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    }
+
     logStep("Subscription set to cancel", { 
       subscriptionId: subscription.id,
-      cancelAt: subscription.cancel_at,
-      currentPeriodEnd: subscription.current_period_end
+      cancelAtPeriodEnd: subscription.cancel_at_period_end,
+      currentPeriodEnd: periodEndTimestamp,
+      periodEndDate
     });
 
     // Update user's plan expiry in database
-    const periodEndDate = new Date(subscription.current_period_end * 1000).toISOString();
-    
     await supabaseClient
       .from("users")
       .update({
