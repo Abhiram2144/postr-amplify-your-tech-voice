@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { loadStripe } from "@stripe/stripe-js";
 import {
   EmbeddedCheckoutProvider,
@@ -14,7 +14,7 @@ import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
-// Use publishable key from environment
+// Use publishable key from environment - MUST match Stripe secret key environment (test/live)
 const stripePromise = loadStripe("pk_live_51SwnpfH0ScE1y6GMNPp8yXfG8b69BHyX8KAbJsifnZA0v8eBrFpTmfADWNi7iNLyZQDSglNWJAjAdlQZ5VGxCKGP00hG9PZzRi");
 
 interface EmbeddedCheckoutModalProps {
@@ -78,10 +78,21 @@ export const EmbeddedCheckoutModal = ({
     }
   }, [open, priceId, fetchClientSecret]);
 
+  // Handle completion - close modal and trigger success callback
   const handleComplete = useCallback(() => {
     onOpenChange(false);
     onSuccess?.();
   }, [onOpenChange, onSuccess]);
+
+  // IMPORTANT: Memoize options to prevent React warning about prop changes
+  // EmbeddedCheckoutProvider requires stable options reference
+  const checkoutOptions = useMemo(() => {
+    if (!clientSecret) return null;
+    return {
+      clientSecret,
+      onComplete: handleComplete,
+    };
+  }, [clientSecret, handleComplete]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -102,13 +113,10 @@ export const EmbeddedCheckoutModal = ({
             </div>
           )}
 
-          {clientSecret && !loading && (
+          {checkoutOptions && !loading && (
             <EmbeddedCheckoutProvider
               stripe={stripePromise}
-              options={{
-                clientSecret,
-                onComplete: handleComplete,
-              }}
+              options={checkoutOptions}
             >
               <EmbeddedCheckout className="min-h-[400px]" />
             </EmbeddedCheckoutProvider>
