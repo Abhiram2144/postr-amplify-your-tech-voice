@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import type { ContentOutput, ProjectNote } from "@/hooks/useProjects";
 import { groupContentOutputs, type ContentGeneration } from "@/lib/content-generations";
@@ -162,6 +163,36 @@ const HistoryPage = () => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const handleDeleteGeneration = async (generationId: string) => {
+    try {
+      const { error } = await supabase
+        .from("content_outputs")
+        .delete()
+        .eq("generation_id", generationId);
+
+      if (error) throw error;
+
+      if (viewGenerationId === generationId) {
+        setViewOpen(false);
+        setViewGenerationId(null);
+        setGenerationNotes([]);
+      }
+
+      await fetchHistory();
+      toast({
+        title: "Content deleted",
+        description: "The generation has been removed",
+      });
+    } catch (error) {
+      console.error("Error deleting generation:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete content",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="p-6 lg:p-8 max-w-5xl mx-auto">
       <motion.div
@@ -250,22 +281,23 @@ const HistoryPage = () => {
                   transition={{ delay: index * 0.05 }}
                   className="group"
                 >
-                  <button
-                    onClick={() => {
-                      setViewGenerationId(gen.generation_id);
-                      setViewOpen(true);
-                    }}
-                    className="w-full text-left"
+                  <motion.div
+                    whileHover={{ y: -2 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 10 }}
                   >
-                    <motion.div
-                      whileHover={{ y: -2 }}
-                      transition={{ type: "spring", stiffness: 400, damping: 10 }}
-                    >
-                      <Card className="hover:shadow-md hover:border-primary/50 transition-all cursor-pointer overflow-hidden">
-                        <CardContent className="p-4">
-                          <div className="space-y-3">
+                    <Card className="hover:shadow-md hover:border-primary/50 transition-all cursor-pointer">
+                      <CardContent className="p-3 sm:p-4">
+
+                        <button
+                          onClick={() => {
+                            setViewGenerationId(gen.generation_id);
+                            setViewOpen(true);
+                          }}
+                          className="w-full text-left"
+                        >
+                          <div className="space-y-2">
                             {/* Metadata Row */}
-                            <div className="flex items-center justify-between gap-4 flex-wrap">
+                            <div className="flex items-start justify-between gap-3">
                               {/* Platforms and Project */}
                               <div className="flex items-center gap-2 flex-wrap">
                                 {gen.platforms.length > 0 && (
@@ -298,9 +330,9 @@ const HistoryPage = () => {
                               </div>
 
                               {/* Score and Date */}
-                              <div className="flex items-center gap-4 text-sm flex-wrap justify-end">
+                              <div className="flex items-center gap-3 text-sm flex-wrap justify-end">
                                 {gen.analysis_score !== null && (
-                                  <div className="flex items-center gap-1.5 bg-primary/10 px-2.5 py-1 rounded-full">
+                                  <div className="flex items-center gap-1.5 bg-primary/10 px-2 py-0.5 rounded-full">
                                     <TrendingUp className="h-3.5 w-3.5 text-primary" />
                                     <span className="font-semibold text-primary">{gen.analysis_score}</span>
                                     <span className="text-xs text-muted-foreground">/100</span>
@@ -312,11 +344,22 @@ const HistoryPage = () => {
                                     {gen.created_at ? format(new Date(gen.created_at), "MMM d, yy") : "No date"}
                                   </span>
                                 </div>
+                                <ContentActionMenu
+                                  onView={() => {
+                                    setViewGenerationId(gen.generation_id);
+                                    setViewOpen(true);
+                                  }}
+                                  onCopy={() => {
+                                    handleCopy(gen.generation_id, gen.representative.content || "");
+                                  }}
+                                  onDelete={() => handleDeleteGeneration(gen.generation_id)}
+                                  isCopied={copiedId === gen.generation_id}
+                                />
                               </div>
                             </div>
 
                             {/* Input Preview */}
-                            <div className="pt-1">
+                            <div>
                               <p className="text-sm text-muted-foreground line-clamp-2 group-hover:text-foreground transition-colors">
                                 {gen.original_input || "No description"}
                               </p>
@@ -327,24 +370,10 @@ const HistoryPage = () => {
                               <span>{(gen.representative.content || "").length} characters</span>
                             </div>
                           </div>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  </button>
-
-                    {/* Action Menu */}
-                    <div className="flex justify-end">
-                      <ContentActionMenu
-                        onView={() => {
-                          setViewGenerationId(gen.generation_id);
-                          setViewOpen(true);
-                        }}
-                        onCopy={() => {
-                          handleCopy(gen.generation_id, gen.representative.content || "");
-                        }}
-                        isCopied={copiedId === gen.generation_id}
-                      />
-                    </div>
+                        </button>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
                   </motion.div>
               ))}
             </motion.div>

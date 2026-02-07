@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -169,6 +169,7 @@ const DashboardSidebar = ({ profile, collapsed, onToggleCollapse }: DashboardSid
 
       {/* Core Navigation */}
       <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto">
+        <LayoutGroup>
         <div className="space-y-1">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
@@ -176,7 +177,7 @@ const DashboardSidebar = ({ profile, collapsed, onToggleCollapse }: DashboardSid
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group relative ${
+                className={`flex w-full items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group relative ${
                   isActive
                     ? "bg-primary/10 text-primary"
                     : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
@@ -184,8 +185,9 @@ const DashboardSidebar = ({ profile, collapsed, onToggleCollapse }: DashboardSid
               >
                 {isActive && (
                   <motion.div
-                    layoutId="activeIndicator"
-                    className={`absolute top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-full ${collapsed ? "left-0" : "left-0"}`}
+                    layoutId={collapsed ? "activeIndicatorCollapsed" : "activeIndicatorExpanded"}
+                    layout="position"
+                    className="absolute left-0 top-2 bottom-2 w-1 bg-primary rounded-full"
                     transition={{ type: "spring", stiffness: 500, damping: 35 }}
                   />
                 )}
@@ -221,12 +223,20 @@ const DashboardSidebar = ({ profile, collapsed, onToggleCollapse }: DashboardSid
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${
+                className={`flex w-full items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group relative ${
                   isActive
                     ? "bg-primary/10 text-primary"
                     : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
                 }`}
               >
+                {isActive && (
+                  <motion.div
+                    layoutId={collapsed ? "activeIndicatorCollapsed" : "activeIndicatorExpanded"}
+                    layout="position"
+                    className="absolute left-0 top-2 bottom-2 w-1 bg-primary rounded-full"
+                    transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                  />
+                )}
                 <item.icon className={`h-5 w-5 shrink-0 transition-transform duration-200 ${isActive ? "" : "group-hover:scale-105"}`} />
                 <AnimatePresence>
                   {!collapsed && (
@@ -245,6 +255,7 @@ const DashboardSidebar = ({ profile, collapsed, onToggleCollapse }: DashboardSid
             );
           })}
         </div>
+        </LayoutGroup>
       </nav>
 
       {/* User Account Section */}

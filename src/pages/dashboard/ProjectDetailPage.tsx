@@ -364,11 +364,11 @@ const ProjectDetailPage = () => {
                           whileHover={{ y: -2 }}
                           transition={{ type: "spring", stiffness: 400, damping: 10 }}
                         >
-                          <Card className="hover:shadow-md hover:border-primary/50 transition-all cursor-pointer overflow-hidden">
-                            <CardContent className="p-4">
-                              <div className="space-y-3">
+                          <Card className="hover:shadow-md hover:border-primary/50 transition-all cursor-pointer">
+                            <CardContent className="p-3 sm:p-4">
+                              <div className="space-y-2">
                                 {/* Metadata Row */}
-                                <div className="flex items-center justify-between gap-4 flex-wrap">
+                                <div className="flex items-start justify-between gap-3">
                                   {/* Platforms */}
                                   <div className="flex items-center gap-2 flex-wrap">
                                     {gen.platforms.length > 0 && (
@@ -395,10 +395,10 @@ const ProjectDetailPage = () => {
                                     )}
                                   </div>
 
-                                  {/* Score and Date */}
-                                  <div className="flex items-center gap-4 text-sm flex-wrap justify-end">
+                                  {/* Score, Date, Actions */}
+                                  <div className="flex items-center gap-3 text-sm flex-wrap justify-end">
                                     {gen.analysis_score !== null && (
-                                      <div className="flex items-center gap-1.5 bg-primary/10 px-2.5 py-1 rounded-full">
+                                      <div className="flex items-center gap-1.5 bg-primary/10 px-2 py-0.5 rounded-full">
                                         <TrendingUp className="h-3.5 w-3.5 text-primary" />
                                         <span className="font-semibold text-primary">{gen.analysis_score}</span>
                                         <span className="text-xs text-muted-foreground">/100</span>
@@ -410,11 +410,22 @@ const ProjectDetailPage = () => {
                                         {gen.created_at ? format(new Date(gen.created_at), "MMM d, yy") : "No date"}
                                       </span>
                                     </div>
+                                    <ContentActionMenu
+                                      onView={() => {
+                                        setViewGenerationId(gen.generation_id);
+                                        setViewGenerationOpen(true);
+                                      }}
+                                      onCopy={() => {
+                                        handleCopy(gen.generation_id, gen.representative.content || "");
+                                      }}
+                                      onDelete={() => deleteGeneration(gen.generation_id)}
+                                      isCopied={copiedId === gen.generation_id}
+                                    />
                                   </div>
                                 </div>
 
                                 {/* Input Preview */}
-                                <div className="pt-1">
+                                <div>
                                   <p className="text-sm text-muted-foreground line-clamp-2 group-hover:text-foreground transition-colors">
                                     {gen.original_input || "No description"}
                                   </p>
@@ -430,20 +441,7 @@ const ProjectDetailPage = () => {
                         </motion.div>
                       </button>
 
-                      {/* Action Menu */}
-                      <div className="flex justify-end">
-                        <ContentActionMenu
-                          onView={() => {
-                            setViewGenerationId(gen.generation_id);
-                            setViewGenerationOpen(true);
-                          }}
-                          onCopy={() => {
-                            handleCopy(gen.generation_id, gen.representative.content || "");
-                          }}
-                          onDelete={() => deleteGeneration(gen.generation_id)}
-                          isCopied={copiedId === gen.generation_id}
-                        />
-                      </div>
+                      {/* Action Menu moved inside card */}
                     </motion.div>
                   ))}
                 </div>

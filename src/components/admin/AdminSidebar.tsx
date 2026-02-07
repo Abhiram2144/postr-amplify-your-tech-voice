@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, LayoutGroup } from "framer-motion";
 import {
   LayoutDashboard,
   Users,
@@ -48,6 +48,7 @@ const AdminSidebar = () => {
 
         {/* Navigation */}
         <nav className="flex-1 space-y-1 px-3">
+          <LayoutGroup>
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
             const Icon = item.icon;
@@ -68,7 +69,8 @@ const AdminSidebar = () => {
                   {isActive && (
                     <motion.div
                       layoutId="admin-sidebar-active"
-                      className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-destructive"
+                      layout="position"
+                      className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-destructive"
                       transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
                     />
                   )}
@@ -78,6 +80,7 @@ const AdminSidebar = () => {
               </Link>
             );
           })}
+          </LayoutGroup>
         </nav>
       </div>
     </aside>
