@@ -37,35 +37,67 @@ serve(async (req) => {
     
     if (userError) throw new Error(`Authentication error: ${userError.message}`);
     const user = userData.user;
-    if (!user?.id) throw new Error("User not authenticated");
+    if (!user?.id || !user?.email) throw new Error("User not authenticated");
     
-    logStep("User authenticated", { userId: user.id });
-
-    // Get stripe data for user
-    const { data: stripeData, error: stripeDataError } = await supabaseClient
-      .from("user_stripe_data")
-      .select("stripe_subscription_id")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (stripeDataError) {
-      logStep("Error fetching stripe data", { error: stripeDataError.message });
-      throw new Error("Failed to fetch subscription data");
-    }
-
-    if (!stripeData?.stripe_subscription_id) {
-      logStep("No active subscription found");
-      return new Response(
-        JSON.stringify({ error: "No active subscription found" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
-      );
-    }
+    logStep("User authenticated", { userId: user.id, email: user.email });
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
 
+    // First try to get subscription from user_stripe_data table
+    const { data: stripeData } = await supabaseClient
+      .from("user_stripe_data")
+      .select("stripe_subscription_id, stripe_customer_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    let subscriptionId = stripeData?.stripe_subscription_id;
+
+    // Fallback: If no stored data, look up by email in Stripe
+    if (!subscriptionId) {
+      logStep("No stored subscription, looking up by email");
+      
+      const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+      if (customers.data.length === 0) {
+        logStep("No Stripe customer found");
+        return new Response(
+          JSON.stringify({ error: "No active subscription found" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        );
+      }
+
+      const customerId = customers.data[0].id;
+      const subscriptions = await stripe.subscriptions.list({
+        customer: customerId,
+        status: "active",
+        limit: 1,
+      });
+
+      if (subscriptions.data.length === 0) {
+        logStep("No active subscription found for customer");
+        return new Response(
+          JSON.stringify({ error: "No active subscription found" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        );
+      }
+
+      subscriptionId = subscriptions.data[0].id;
+      
+      // Store the found data for next time
+      await supabaseClient
+        .from("user_stripe_data")
+        .upsert({
+          user_id: user.id,
+          stripe_customer_id: customerId,
+          stripe_subscription_id: subscriptionId,
+          updated_at: new Date().toISOString()
+        }, { onConflict: "user_id" });
+      
+      logStep("Found and stored subscription", { subscriptionId });
+    }
+
     // Cancel at period end (user keeps access until end of billing period)
     const subscription = await stripe.subscriptions.update(
-      stripeData.stripe_subscription_id,
+      subscriptionId,
       { cancel_at_period_end: true }
     );
 
