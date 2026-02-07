@@ -3,6 +3,14 @@ import { useOutletContext, useSearchParams, useNavigate } from "react-router-dom
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -59,9 +67,11 @@ const MyPlanTabContent = ({ profile }: { profile: UserProfile | null }) => {
   const { toast } = useToast();
   const [loadingPortal, setLoadingPortal] = useState(false);
   const [loadingCheckout, setLoadingCheckout] = useState<string | null>(null);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
 
   const profilePlan = normalizePlan(profile?.plan);
   const effectivePlan = subscriptionPlan !== "free" ? subscriptionPlan : profilePlan;
+  const isPaidPlan = effectivePlan !== "free";
 
   const handleManageSubscription = async () => {
     setLoadingPortal(true);
@@ -76,6 +86,26 @@ const MyPlanTabContent = ({ profile }: { profile: UserProfile | null }) => {
     } finally {
       setLoadingPortal(false);
     }
+  };
+
+  const handleCancelSubscription = async () => {
+    setLoadingPortal(true);
+    try {
+      await openCustomerPortal();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: getSafeErrorMessage(error),
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingPortal(false);
+    }
+  };
+
+  const handleConfirmCancel = async () => {
+    setShowCancelDialog(false);
+    await handleCancelSubscription();
   };
 
   const handleUpgrade = async (priceId: string, planName: string) => {
@@ -142,8 +172,10 @@ const MyPlanTabContent = ({ profile }: { profile: UserProfile | null }) => {
         <CardHeader>
           <CardTitle>Current Plan</CardTitle>
           <CardDescription>
-            {subscribed && subscriptionEnd
-              ? `Renews on ${new Date(subscriptionEnd).toLocaleDateString()}`
+            {isPaidPlan
+              ? subscriptionEnd
+                ? `Renews on ${new Date(subscriptionEnd).toLocaleDateString()}`
+                : `Active plan: ${STRIPE_PLANS[effectivePlan].name}`
               : "You're currently on the free plan"}
           </CardDescription>
         </CardHeader>
@@ -254,6 +286,49 @@ const MyPlanTabContent = ({ profile }: { profile: UserProfile | null }) => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Billing */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Billing</CardTitle>
+          <CardDescription>
+            {isPaidPlan
+              ? "Downgrade to free anytime from the customer portal"
+              : "You do not have an active subscription"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col sm:flex-row gap-3">
+          <Button
+            variant="destructive"
+            onClick={() => setShowCancelDialog(true)}
+            disabled={!isPaidPlan || loadingPortal}
+            className="focus-visible:ring-0 focus-visible:ring-offset-0"
+          >
+            {loadingPortal ? "Opening..." : "Downgrade to free"}
+          </Button>
+        </CardContent>
+      </Card>
+      <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Downgrade to free?</DialogTitle>
+            <DialogDescription>
+              You will keep access until the end of your current billing period. This will open Stripe so you can confirm the downgrade.
+            </DialogDescription>
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-muted-foreground">
+              Downgrades may take effect immediately or at the period end depending on your Stripe settings.
+            </div>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCancelDialog(false)}>
+              Keep current plan
+            </Button>
+            <Button variant="destructive" onClick={handleConfirmCancel}>
+              Continue to Stripe
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 };
