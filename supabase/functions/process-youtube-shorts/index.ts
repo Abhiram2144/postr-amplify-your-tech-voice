@@ -223,10 +223,49 @@ serve(async (req) => {
     };
     logStep("YouTube metadata fetched", { title: metadata.title, channel: metadata.channelTitle });
 
-    // Step 2: Get audio URL for transcription
-    // For YouTube, we need to use a service to extract audio
-    // Using a reliable audio extraction approach via ytdl
-    const audioUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    // Step 2: Extract audio URL using cobalt.tools API
+    // This service extracts direct audio URLs from YouTube videos
+    logStep("Extracting audio URL via cobalt");
+    
+    const cobaltResponse = await fetch("https://api.cobalt.tools/", {
+      method: "POST",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        url: `https://www.youtube.com/watch?v=${videoId}`,
+        downloadMode: "audio",
+        audioFormat: "mp3",
+      }),
+    });
+
+    if (!cobaltResponse.ok) {
+      const errorText = await cobaltResponse.text();
+      logStep("Cobalt extraction error", { status: cobaltResponse.status, error: errorText });
+      throw new Error("Failed to extract audio from video. Please try again later.");
+    }
+
+    const cobaltData = await cobaltResponse.json();
+    logStep("Cobalt response", { status: cobaltData.status });
+
+    // Check if we got a valid audio URL
+    let audioUrl: string;
+    if (cobaltData.status === "stream" || cobaltData.status === "redirect") {
+      audioUrl = cobaltData.url;
+    } else if (cobaltData.status === "tunnel") {
+      audioUrl = cobaltData.url;
+    } else if (cobaltData.status === "picker" && cobaltData.picker?.length > 0) {
+      // If multiple options, pick the first audio one
+      const audioOption = cobaltData.picker.find((p: { type?: string }) => p.type === "audio") || cobaltData.picker[0];
+      audioUrl = audioOption.url;
+    } else if (cobaltData.status === "error") {
+      throw new Error(`Audio extraction failed: ${cobaltData.error?.code || "unknown error"}`);
+    } else {
+      throw new Error("Could not extract audio URL from video");
+    }
+
+    logStep("Audio URL extracted", { urlLength: audioUrl.length });
     
     // Step 3: Submit to AssemblyAI for transcription
     logStep("Submitting to AssemblyAI");
@@ -247,8 +286,8 @@ serve(async (req) => {
 
     if (!transcriptResponse.ok) {
       const errorText = await transcriptResponse.text();
-      logStep("AssemblyAI submit error", { status: transcriptResponse.status });
-      throw new Error("Failed to submit video for transcription");
+      logStep("AssemblyAI submit error", { status: transcriptResponse.status, error: errorText });
+      throw new Error("Failed to submit audio for transcription");
     }
 
     const transcriptData = await transcriptResponse.json();
