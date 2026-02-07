@@ -129,6 +129,7 @@ serve(async (req) => {
     let plan = "free";
     let subscriptionEnd = null;
     let subscriptionId = null;
+    let cancellingAt = null;
 
     if (hasActiveSub) {
       const subscription = subscriptions.data[0];
@@ -137,12 +138,18 @@ serve(async (req) => {
       const productId = subscription.items.data[0].price.product as string;
       plan = PLAN_MAPPING[productId] || "free";
       
+      // Check if subscription is set to cancel at period end
+      if (subscription.cancel_at_period_end) {
+        cancellingAt = subscriptionEnd;
+        logStep("Subscription set to cancel", { cancellingAt });
+      }
+      
       // Get subscription start date safely (handle cases where it might not exist)
       const startDate = subscription.start_date 
         ? new Date(subscription.start_date * 1000).toISOString()
         : new Date().toISOString();
       
-      logStep("Active subscription found", { plan, endDate: subscriptionEnd });
+      logStep("Active subscription found", { plan, endDate: subscriptionEnd, cancellingAt });
 
       // Update user record with subscription info (non-sensitive data only)
       const limits = plan === "pro" 
@@ -180,7 +187,8 @@ serve(async (req) => {
       subscribed: hasActiveSub,
       plan,
       subscription_end: subscriptionEnd,
-      subscription_id: subscriptionId
+      subscription_id: subscriptionId,
+      cancelling_at: cancellingAt
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
