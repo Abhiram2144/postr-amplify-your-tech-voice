@@ -83,6 +83,7 @@ const Pricing = () => {
         "3 platforms",
         "Standard processing",
       ],
+      analysisDetail: "Basic scores & 2 suggestions",
     },
     {
       name: "Creator",
@@ -104,13 +105,14 @@ const Pricing = () => {
         "60 ideas per month",
         "20 video uploads",
         "10 projects max",
-        "2 free rewrites",
+        "1 free rewrite",
         "Text and video input",
         "Advanced content analysis",
         "Unlimited platform exports",
         "Fast processing",
         "Full project history",
       ],
+      analysisDetail: "Detailed scores, 3 strengths & improvements",
     },
     {
       name: "Pro",
@@ -130,9 +132,9 @@ const Pricing = () => {
         : STRIPE_PLANS.pro.yearly.priceId,
       features: [
         "150 ideas per month",
-        "Unlimited video uploads",
+        "50 video uploads",
         "50 projects max",
-        "3 free rewrites",
+        "2 free rewrites",
         "Text and video input",
         "Deep content analysis",
         "Unlimited platform exports",
@@ -140,6 +142,7 @@ const Pricing = () => {
         "Full project history",
         "Tone customization",
       ],
+      analysisDetail: "Deep scores, 5 strengths & improvements, psychological hooks",
     },
   ];
 

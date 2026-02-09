@@ -271,6 +271,44 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
+    // Determine user plan tier for prompt differentiation
+    const userPlan = (userProfile.plan || "free").toLowerCase();
+    const planTier = userPlan.includes("pro") ? "pro" : userPlan.includes("creator") ? "creator" : "free";
+    logStep("Plan tier for generation", { planTier });
+
+    // Plan-specific analysis depth instructions
+    const analysisDepthByPlan: Record<string, string> = {
+      free: `Provide basic analysis:
+- Give scores as rough estimates (clarity, hook, engagement, structure)
+- List exactly 2 strengths and 2 improvements
+- Keep feedback concise and general`,
+      creator: `Provide advanced analysis:
+- Give accurate, detailed scores (clarity, hook, engagement, structure)
+- List exactly 3 strengths and 3 improvements with specific examples
+- Include actionable suggestions referencing the actual content
+- Explain WHY each score is what it is`,
+      pro: `Provide deep, expert-level analysis:
+- Give precise scores with justification (clarity, hook, engagement, structure)
+- List exactly 5 strengths and 5 improvements with specific, actionable examples
+- Include psychological engagement tactics (curiosity gaps, pattern interrupts, open loops)
+- Reference platform algorithm preferences and trending formats
+- Suggest A/B testing variations for hooks
+- Analyze emotional triggers and audience retention patterns`,
+    };
+
+    // Plan-specific content quality instructions
+    const contentQualityByPlan: Record<string, string> = {
+      free: `Generate solid, functional content for each platform. Focus on clarity and basic engagement.`,
+      creator: `Generate high-quality, optimized content for each platform. Use proven engagement patterns, strong hooks, strategic formatting, and platform-native language. Make each post feel crafted, not generated.`,
+      pro: `Generate premium, expert-crafted content for each platform. Apply:
+- Psychological hooks (curiosity gaps, pattern interrupts, contrarian takes)
+- Platform-specific algorithm optimization (LinkedIn: dwell time; Twitter: quote-tweet bait; Instagram: save-worthy formatting)
+- Narrative arcs even in short-form content
+- Strategic emoji and formatting for maximum visual hierarchy
+- Engagement triggers (hot takes, thought-provoking questions, relatable pain points)
+- Each post should feel like it was written by a top 1% creator on that platform`,
+    };
+
     // Construct the prompt based on mode
     let contentPrompt: string;
     
@@ -283,11 +321,12 @@ Target Audience: ${audience || "General audience"}
 Intent: ${intent || "Explain"}
 Tone: ${tone || "Casual"}
 
+${contentQualityByPlan[planTier]}
+
 First, analyze what would make compelling content about this topic for the target audience.
 Then create platform-specific versions that feel native to each platform.
 `;
     } else if (mode === "video" && video_context && video_intent) {
-      // YouTube Shorts Intelligence Mode - enriched context generation
       contentPrompt = `
 You are a senior content strategist who transforms video content into platform-native posts.
 You think deeply before writing. You never generate generic content.
@@ -309,7 +348,7 @@ Tone: ${video_intent.tone}
 Core Message: ${video_intent.core_message}
 
 Key Takeaways:
-${video_intent.key_takeaways.map((t, i) => `${i + 1}. ${t}`).join("\n")}
+${video_intent.key_takeaways.map((t: string, i: number) => `${i + 1}. ${t}`).join("\n")}
 
 === YOUR MISSION ===
 1. Preserve the original creator's THINKING, not just their words
@@ -318,6 +357,8 @@ ${video_intent.key_takeaways.map((t, i) => `${i + 1}. ${t}`).join("\n")}
 4. Make the output feel like it was written by a thoughtful human creator
 5. Do NOT paraphrase blindly or generate fluffy content
 6. Do NOT explain obvious things or sound like an AI assistant
+
+${contentQualityByPlan[planTier]}
 
 Analyze the content for clarity, hook strength, engagement potential, and structure.
 Then create platform-specific versions that are sharper and more valuable than generic rewrites.
@@ -328,6 +369,8 @@ You are a content analysis and improvement expert. Analyze and improve this scri
 
 ORIGINAL SCRIPT:
 ${script_text}
+
+${contentQualityByPlan[planTier]}
 
 Your tasks:
 1. Analyze the script for clarity, hook strength, engagement potential, and structure
@@ -341,16 +384,20 @@ Your tasks:
       .map(p => PLATFORM_INSTRUCTIONS[p.toLowerCase()] || `Format for ${p}: Create platform-appropriate content.`)
       .join("\n\n");
 
-    // Full system prompt
-    const systemPrompt = `You are an expert social media content creator and analyst. 
-You understand platform algorithms, engagement patterns, and what makes content go viral.
-Always provide actionable, specific analysis and high-quality, platform-native content.
-Never be generic - tailor everything to the specific topic and audience.`;
+    // Full system prompt - differentiated by plan
+    const systemPromptByPlan: Record<string, string> = {
+      free: `You are a helpful social media content creator. Provide clear, functional content and basic analysis.`,
+      creator: `You are an expert social media content creator and analyst. You understand platform algorithms, engagement patterns, and what makes content perform well. Provide detailed, actionable analysis and high-quality, platform-native content. Tailor everything to the specific topic and audience.`,
+      pro: `You are an elite social media strategist trusted by top creators and brands. You have deep expertise in platform algorithms, viral mechanics, psychological engagement triggers, and audience growth. You write content that consistently outperforms — using curiosity gaps, pattern interrupts, contrarian framing, and emotional resonance. Your analysis is surgical and your content is indistinguishable from top 1% creators. Never be generic. Every word must earn its place.`,
+    };
 
     const fullPrompt = `${contentPrompt}
 
 PLATFORMS TO CREATE CONTENT FOR:
 ${platformInstructions}
+
+=== ANALYSIS DEPTH ===
+${analysisDepthByPlan[planTier]}
 
 RESPONSE FORMAT (use this exact JSON structure):
 {
@@ -359,8 +406,8 @@ RESPONSE FORMAT (use this exact JSON structure):
     "hookStrength": <0-100>,
     "engagementScore": <0-100>,
     "structureScore": <0-100>,
-    "strengths": ["strength 1", "strength 2", "strength 3"],
-    "improvements": ["improvement 1", "improvement 2", "improvement 3"]
+    "strengths": ["strength 1", ...],
+    "improvements": ["improvement 1", ...]
   },
   "outputs": [
     {"platform": "platform_name", "content": "full formatted content for this platform"},
@@ -382,7 +429,7 @@ Return ONLY valid JSON, no markdown code blocks or additional text.`;
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
         messages: [
-          { role: "system", content: systemPrompt },
+          { role: "system", content: systemPromptByPlan[planTier] },
           { role: "user", content: fullPrompt },
         ],
       }),
