@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { useSubscription } from "./useSubscription";
+import { STRIPE_PLANS, PlanType } from "@/lib/stripe-config";
 
 interface CreditsContextType {
   creditsUsed: number;
@@ -15,14 +17,23 @@ const CreditsContext = createContext<CreditsContextType | undefined>(undefined);
 
 export const CreditsProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
+  const { plan: subscriptionPlan } = useSubscription();
   const [creditsUsed, setCreditsUsed] = useState(0);
   const [creditsLimit, setCreditsLimit] = useState(10);
   const [loading, setLoading] = useState(true);
 
+  const normalizePlan = (value?: string | null): PlanType => {
+    const normalized = (value ?? "").toLowerCase();
+    if (normalized.includes("pro")) return "pro";
+    if (normalized.includes("creator")) return "creator";
+    return "free";
+  };
+
   const refreshCredits = useCallback(async () => {
     if (!user?.id) {
       setCreditsUsed(0);
-      setCreditsLimit(10);
+      const fallbackPlan = normalizePlan(subscriptionPlan);
+      setCreditsLimit(STRIPE_PLANS[fallbackPlan].limits.ideasPerMonth);
       setLoading(false);
       return;
     }
@@ -47,13 +58,16 @@ export const CreditsProvider = ({ children }: { children: ReactNode }) => {
         setCreditsUsed(data.generations_used_this_month || 0);
       }
       
-      setCreditsLimit(data.monthly_generation_limit || 10);
+      const fallbackPlan = normalizePlan(subscriptionPlan);
+      const planLimit = STRIPE_PLANS[fallbackPlan].limits.ideasPerMonth;
+      const dbLimit = data.monthly_generation_limit ?? 0;
+      setCreditsLimit(Math.max(dbLimit, planLimit));
     } catch (error) {
       console.error("Error fetching credits:", error);
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, subscriptionPlan]);
 
   const updateCreditsAfterGeneration = useCallback((newUsed: number) => {
     setCreditsUsed(newUsed);

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, Outlet } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
+import { useSubscription } from "@/hooks/useSubscription";
 import { supabase } from "@/integrations/supabase/client";
 import DashboardSidebar from "./DashboardSidebar";
 
@@ -21,6 +22,7 @@ export interface UserProfile {
 const DashboardLayout = () => {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
+  const { plan } = useSubscription();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -35,6 +37,12 @@ const DashboardLayout = () => {
       fetchProfile();
     }
   }, [user, loading, navigate]);
+
+  useEffect(() => {
+    if (user) {
+      fetchProfile();
+    }
+  }, [user, plan]);
 
   const fetchProfile = async () => {
     if (!user) return;

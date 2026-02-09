@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Trophy, Zap, PartyPopper, Rocket, X } from "lucide-react";
+import { Sparkles, Trophy, Zap, PartyPopper, Rocket, X, Loader2 } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
 
 interface CheckoutSuccessModalProps {
@@ -11,16 +11,30 @@ interface CheckoutSuccessModalProps {
 }
 
 const CheckoutSuccessModal = ({ open, onClose }: CheckoutSuccessModalProps) => {
-  const { plan, checkSubscription } = useSubscription();
+  const { plan, checkSubscription, loading } = useSubscription();
   const [showConfetti, setShowConfetti] = useState(false);
+  const [checkingPlan, setCheckingPlan] = useState(false);
 
   useEffect(() => {
-    if (open) {
-      checkSubscription();
-      setShowConfetti(true);
-      const timer = setTimeout(() => setShowConfetti(false), 3000);
-      return () => clearTimeout(timer);
-    }
+    if (!open) return;
+
+    let isActive = true;
+    const refreshPlan = async () => {
+      setCheckingPlan(true);
+      await checkSubscription();
+      if (isActive) {
+        setCheckingPlan(false);
+      }
+    };
+
+    refreshPlan();
+    setShowConfetti(true);
+    const timer = setTimeout(() => setShowConfetti(false), 3000);
+
+    return () => {
+      isActive = false;
+      clearTimeout(timer);
+    };
   }, [open, checkSubscription]);
 
   const planDetails = {
@@ -47,6 +61,7 @@ const CheckoutSuccessModal = ({ open, onClose }: CheckoutSuccessModalProps) => {
     },
   };
 
+  const isLoadingPlan = loading || checkingPlan;
   const currentPlan = planDetails[plan] || planDetails.free;
   const Icon = currentPlan.icon;
 
@@ -180,17 +195,24 @@ const CheckoutSuccessModal = ({ open, onClose }: CheckoutSuccessModalProps) => {
                   <p className="text-sm text-muted-foreground mb-2">
                     Your new monthly allowance
                   </p>
-                  <motion.div
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.65 }}
-                    className="flex items-center justify-center gap-2"
-                  >
-                    <span className="text-2xl">{currentPlan.emoji}</span>
-                    <p className="text-lg font-bold text-foreground">
-                      {currentPlan.credits}
-                    </p>
-                  </motion.div>
+                  {isLoadingPlan ? (
+                    <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Finalizing your plan...
+                    </div>
+                  ) : (
+                    <motion.div
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.65 }}
+                      className="flex items-center justify-center gap-2"
+                    >
+                      <span className="text-2xl">{currentPlan.emoji}</span>
+                      <p className="text-lg font-bold text-foreground">
+                        {currentPlan.credits}
+                      </p>
+                    </motion.div>
+                  )}
                 </motion.div>
 
                 {/* CTA */}

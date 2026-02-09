@@ -37,6 +37,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
+      setLoading(true);
       const { data, error } = await supabase.functions.invoke("check-subscription", {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
