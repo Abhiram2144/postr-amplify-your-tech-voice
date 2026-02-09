@@ -305,11 +305,11 @@ const DashboardSidebar = ({ profile, collapsed, onToggleCollapse }: DashboardSid
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" side="top" className="w-56">
-            <DropdownMenuItem onClick={() => navigate("/dashboard/settings")}>
+            <DropdownMenuItem onClick={() => navigate("/dashboard/settings?tab=plan")}>
               <User className="h-4 w-4 mr-2" />
               Account
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate("/dashboard/settings?tab=billing")}>
+            <DropdownMenuItem onClick={() => navigate("/dashboard/settings?tab=plan")}>
               <CreditCard className="h-4 w-4 mr-2" />
               Billing
             </DropdownMenuItem>

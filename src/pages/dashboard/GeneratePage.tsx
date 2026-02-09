@@ -64,6 +64,8 @@ const PLATFORM_CONFIG = [
   { id: "reddit", label: "Reddit", icon: "🤖" },
 ];
 
+const DEFAULT_PROJECT_TITLE = "Content Library";
+
 // Mock data for video mode demo
 const MOCK_VIDEO_ANALYSIS = {
   transcript: `So today I want to talk about something that's been on my mind - the future of AI in content creation. 
@@ -323,6 +325,52 @@ const GeneratePage = () => {
     const match = projectOptions.find((p) => p.id === selectedProjectId);
     return match?.title || "Untitled Project";
   }, [projectOptions, selectedProjectId]);
+
+  const getOrCreateDefaultProject = useCallback(async () => {
+    if (!user?.id) throw new Error("User not authenticated");
+
+    const existingOption = projectOptions.find(
+      (project) => (project.title || "").toLowerCase() === DEFAULT_PROJECT_TITLE.toLowerCase()
+    );
+
+    if (existingOption) {
+      return existingOption;
+    }
+
+    const { data: existingDb, error: existingError } = await supabase
+      .from("projects")
+      .select("id, title")
+      .eq("user_id", user.id)
+      .eq("title", DEFAULT_PROJECT_TITLE)
+      .limit(1);
+
+    if (existingError) throw existingError;
+
+    if (existingDb && existingDb.length > 0) {
+      const fallbackProject = existingDb[0];
+      setProjectOptions((prev) => {
+        const alreadyListed = prev.some((project) => project.id === fallbackProject.id);
+        return alreadyListed ? prev : [fallbackProject, ...prev];
+      });
+      return fallbackProject;
+    }
+
+    const { data: createdProject, error: createError } = await supabase
+      .from("projects")
+      .insert({
+        user_id: user.id,
+        title: DEFAULT_PROJECT_TITLE,
+        status: "active",
+        archived: false,
+      })
+      .select("id, title")
+      .single();
+
+    if (createError) throw createError;
+
+    setProjectOptions((prev) => [createdProject, ...prev]);
+    return createdProject;
+  }, [projectOptions, user?.id]);
 
   const normalizedPlan = (plan || profile?.plan || "free").toLowerCase();
   const videoCreditsLimit =
@@ -588,15 +636,6 @@ const GeneratePage = () => {
   };
 
   const handleSaveSelectedToProject = async () => {
-    if (!selectedProjectId) {
-      toast({
-        title: "No Project Selected",
-        description: "Please select a project from the dropdown above to save your content.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (Object.keys(selectedVariantByPlatform).length === 0) {
       toast({
         title: "No Selection",
@@ -609,6 +648,14 @@ const GeneratePage = () => {
     setIsProcessing(true);
 
     try {
+      const resolvedProject = selectedProjectId
+        ? { id: selectedProjectId, title: selectedProjectLabel || "your project" }
+        : await getOrCreateDefaultProject();
+
+      if (!selectedProjectId) {
+        setSelectedProjectId(resolvedProject.id);
+      }
+
       // Get only the selected variants
       const selectedVariants = Object.values(selectedVariantByPlatform);
       const uniqueVariantIds = Array.from(new Set(selectedVariants));
@@ -618,14 +665,14 @@ const GeneratePage = () => {
       for (const variantId of uniqueVariantIds) {
         const variant = outputVariants.find((v) => v.id === variantId);
         if (variant) {
-          await persistOutputs(selectedProjectId, { analysis: variant.analysis, outputs: variant.outputs }, testingMode ? "mock" : "ai");
+          await persistOutputs(resolvedProject.id, { analysis: variant.analysis, outputs: variant.outputs }, testingMode ? "mock" : "ai");
         }
       }
 
       setVariantsSaved(true);
       toast({
         title: "Saved to Project",
-        description: `Saved ${uniqueVariantIds.length} variant(s) under "${selectedProjectLabel || "your project"}".`,
+        description: `Saved ${uniqueVariantIds.length} variant(s) under "${resolvedProject.title || DEFAULT_PROJECT_TITLE}".`,
       });
 
       // Reset flow after successful save

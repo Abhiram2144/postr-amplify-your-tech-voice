@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useOutletContext, useSearchParams, useNavigate } from "react-router-dom";
+import { useOutletContext, useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -54,6 +54,13 @@ const normalizePlan = (value?: string | null): PlanType => {
   if (normalized.includes("pro")) return "pro";
   if (normalized.includes("creator")) return "creator";
   return "free";
+};
+
+const normalizeSettingsTab = (value?: string | null) => {
+  if (!value) return null;
+  if (value === "billing") return "plan";
+  if (["profile", "platforms", "plan", "security"].includes(value)) return value;
+  return null;
 };
 
 const platformLimitForPlan = (effectivePlan: PlanType) => {
@@ -419,6 +426,7 @@ const SettingsPage = () => {
   const { plan: subscriptionPlan } = useSubscription();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState("profile");
   const [fullName, setFullName] = useState(profile?.full_name || "");
@@ -427,12 +435,15 @@ const SettingsPage = () => {
   const profilePlan = normalizePlan(profile?.plan);
   const effectivePlan = subscriptionPlan !== "free" ? subscriptionPlan : profilePlan;
 
+  const tabParam = searchParams.get("tab");
+  const normalizedTab = normalizeSettingsTab(tabParam);
+
   useEffect(() => {
-    const tab = searchParams.get("tab");
-    if (tab && ["profile", "platforms", "plan", "security"].includes(tab)) {
-      setActiveTab(tab);
+    const nextTab = normalizeSettingsTab(new URLSearchParams(location.search).get("tab"));
+    if (nextTab) {
+      setActiveTab(nextTab);
     }
-  }, [searchParams]);
+  }, [location.search]);
 
   useEffect(() => {
     setFullName(profile?.full_name || "");
