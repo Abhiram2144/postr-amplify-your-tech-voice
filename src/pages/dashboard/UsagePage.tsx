@@ -94,18 +94,46 @@ const UsagePage = () => {
   const getPlanFeatures = () => {
     const ideasLabel = formatLimit(generationsLimit);
     const videosLabel = formatLimit(videosLimit);
-    const platformsLabel =
-      planConfig.limits.platforms === "all"
-        ? "All platforms unlocked"
-        : `${planConfig.limits.platforms} platforms`;
-    const supportLabel =
-      effectivePlan === "pro"
-        ? "Priority processing"
-        : effectivePlan === "creator"
-        ? "Email support"
-        : "Community support";
 
-    return [`${ideasLabel} text generations/month`, `${videosLabel} video analyses/month`, platformsLabel, supportLabel];
+    if (effectivePlan === "free") {
+      return [
+        `${ideasLabel} ideas per month`,
+        `${videosLabel} video uploads`,
+        `${planConfig.limits.projectsLimit} projects max`,
+        "1 free rewrite",
+        "Text and video input",
+        "Basic content analysis",
+        `${planConfig.limits.platforms} platforms`,
+        "Standard processing",
+      ];
+    }
+
+    if (effectivePlan === "creator") {
+      return [
+        `${ideasLabel} ideas per month`,
+        `${videosLabel} video uploads`,
+        `${planConfig.limits.projectsLimit} projects max`,
+        "1 free rewrite",
+        "Text and video input",
+        "Advanced content analysis",
+        "Unlimited platform exports",
+        "Fast processing",
+        "Full project history",
+      ];
+    }
+
+    return [
+      `${ideasLabel} ideas per month`,
+      `${videosLabel} video uploads`,
+      `${planConfig.limits.projectsLimit} projects max`,
+      "2 free rewrites",
+      "Text and video input",
+      "Deep content analysis",
+      "Unlimited platform exports",
+      "Priority processing",
+      "Full project history",
+      "Tone customization",
+    ];
   };
 
   return (
