@@ -1,8 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, Outlet, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
+import { supabase } from "@/integrations/supabase/client";
 import AdminSidebar from "./AdminSidebar";
 
 const AdminLayout = () => {
@@ -10,6 +11,39 @@ const AdminLayout = () => {
   const location = useLocation();
   const { user, loading: authLoading } = useAuth();
   const { isAdmin, loading: roleLoading } = useRole();
+  const [serverVerified, setServerVerified] = useState(false);
+  const [verifying, setVerifying] = useState(true);
+
+  // Server-side role verification via RPC to prevent client-side manipulation
+  useEffect(() => {
+    const verifyAdminRole = async () => {
+      if (!user) {
+        setServerVerified(false);
+        setVerifying(false);
+        return;
+      }
+      try {
+        const { data, error } = await supabase.rpc("has_role", {
+          _user_id: user.id,
+          _role: "admin",
+        });
+        if (error) {
+          console.error("Admin role verification failed:", error.message);
+          setServerVerified(false);
+        } else {
+          setServerVerified(!!data);
+        }
+      } catch {
+        setServerVerified(false);
+      } finally {
+        setVerifying(false);
+      }
+    };
+    
+    if (!authLoading) {
+      verifyAdminRole();
+    }
+  }, [user, authLoading]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -17,13 +51,13 @@ const AdminLayout = () => {
       return;
     }
 
-    if (!authLoading && !roleLoading && !isAdmin) {
+    if (!authLoading && !verifying && !serverVerified) {
       navigate("/dashboard");
       return;
     }
-  }, [user, authLoading, isAdmin, roleLoading, navigate]);
+  }, [user, authLoading, serverVerified, verifying, navigate]);
 
-  if (authLoading || roleLoading) {
+  if (authLoading || verifying) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <motion.div
@@ -38,7 +72,7 @@ const AdminLayout = () => {
     );
   }
 
-  if (!isAdmin) {
+  if (!serverVerified) {
     return null;
   }
 
