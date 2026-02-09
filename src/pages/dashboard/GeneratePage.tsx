@@ -64,6 +64,13 @@ const PLATFORM_CONFIG = [
   { id: "reddit", label: "Reddit", icon: "🤖" },
 ];
 
+const TEXT_GENERATION_STAGES = [
+  "Analyzing the given prompt",
+  "Generating the content",
+  "Improving the content for platforms",
+];
+
+
 const DEFAULT_PROJECT_TITLE = "Content Library";
 
 // Mock data for video mode demo
@@ -229,6 +236,17 @@ interface VideoProcessingResult {
 
 type VideoProcessingStep = "idle" | "validating" | "fetching_metadata" | "transcribing" | "analyzing" | "generating" | "complete" | "error";
 
+const VIDEO_GENERATION_STAGES: Record<VideoProcessingStep, string> = {
+  idle: "Preparing video analysis",
+  validating: "Validating video URL",
+  fetching_metadata: "Fetching video metadata",
+  transcribing: "Transcribing audio",
+  analyzing: "Analyzing creator intent",
+  generating: "Generating platform content",
+  complete: "Finalizing results",
+  error: "Processing failed",
+};
+
 const GeneratePage = () => {
   const { profile } = useOutletContext<DashboardContext>();
   const { user, session } = useAuth();
@@ -247,6 +265,8 @@ const GeneratePage = () => {
   const [copiedPlatform, setCopiedPlatform] = useState<string | null>(null);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [testingMode, setTestingMode] = useState(true); // Enable testing mode by default
+  const [textStageIndex, setTextStageIndex] = useState(0);
+  const [outputDetailTab, setOutputDetailTab] = useState<"content" | "analysis" | "improvements">("content");
 
 
   // Project selection (required to persist content because of RLS)
@@ -319,6 +339,15 @@ const GeneratePage = () => {
 
     loadProjects();
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!isProcessing || currentStep !== 1 || creationMode === "video") return;
+    setTextStageIndex(0);
+    const intervalId = window.setInterval(() => {
+      setTextStageIndex((prev) => (prev + 1) % TEXT_GENERATION_STAGES.length);
+    }, 1400);
+    return () => window.clearInterval(intervalId);
+  }, [creationMode, currentStep, isProcessing]);
 
   const selectedProjectLabel = useMemo(() => {
     if (!selectedProjectId) return null;
@@ -443,7 +472,8 @@ const GeneratePage = () => {
       setTimeout(() => {
         addOutputVariant({ analysis: MOCK_VIDEO_ANALYSIS.analysis, outputs: MOCK_VIDEO_ANALYSIS.outputs }, append);
         if (!append) {
-          setCurrentStep(2);
+          setOutputDetailTab("content");
+          setCurrentStep(4);
         } else {
           setHasGeneratedAnother(true);
           toast({
@@ -504,8 +534,8 @@ const GeneratePage = () => {
       if (append) {
         setHasGeneratedAnother(true);
       }
-      
-      setCurrentStep(append ? 4 : 2);
+      setOutputDetailTab("content");
+      setCurrentStep(4);
       
       toast({
         title: append ? "Another version generated" : "Content Generated!",
@@ -605,8 +635,8 @@ const GeneratePage = () => {
       if (append) {
         setHasGeneratedAnother(true);
       }
-      
-      setCurrentStep(append ? 4 : 2);
+      setOutputDetailTab("content");
+      setCurrentStep(4);
       
       toast({
         title: append ? "Another version generated" : "Video Analyzed & Content Generated!",
@@ -693,6 +723,8 @@ const GeneratePage = () => {
 
   const resetFlow = () => {
     setCurrentStep(1);
+    setOutputDetailTab("content");
+    setTextStageIndex(0);
     setAnalysis(null);
     setOutputs([]);
     setOutputVariants([]);
@@ -752,6 +784,18 @@ const GeneratePage = () => {
   };
 
   const platformTabs = getAllPlatforms();
+  const videoStageOrder: VideoProcessingStep[] = ["validating", "fetching_metadata", "transcribing", "analyzing", "generating", "complete"];
+  const currentVideoStageIndex = Math.max(0, videoStageOrder.indexOf(videoProcessingStep));
+  const activeStageList = creationMode === "video"
+    ? videoStageOrder.map((stage) => VIDEO_GENERATION_STAGES[stage])
+    : TEXT_GENERATION_STAGES;
+  const activeStageIndex = creationMode === "video" ? currentVideoStageIndex : textStageIndex;
+  const activeStageLabel = creationMode === "video"
+    ? VIDEO_GENERATION_STAGES[videoProcessingStep]
+    : TEXT_GENERATION_STAGES[textStageIndex];
+  const activeStageProgress = creationMode === "video"
+    ? ((currentVideoStageIndex + 1) / videoStageOrder.length) * 100
+    : ((textStageIndex + 1) / TEXT_GENERATION_STAGES.length) * 100;
 
   return (
     <div className="p-6 lg:p-8 max-w-4xl mx-auto">
@@ -893,7 +937,7 @@ const GeneratePage = () => {
                     {creationMode === "video" && "Add Your Video"}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-4 relative">
                   {creationMode === "brief_topic" && (
                     <div className="space-y-4">
                       <div className="space-y-2">
@@ -1121,6 +1165,46 @@ const GeneratePage = () => {
                       Link a project if you want this generation to appear in Projects and History.
                     </p>
                   </div>
+
+                  {isProcessing && currentStep === 1 && (
+                    <div className="absolute inset-0 z-10 rounded-lg bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
+                      <div className="w-full max-w-md rounded-xl border bg-background/90 p-5 shadow-sm">
+                        <div className="flex items-center gap-3">
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                            className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center"
+                          >
+                            <Sparkles className="h-4 w-4 text-primary" />
+                          </motion.div>
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">{activeStageLabel}</p>
+                            <p className="text-xs text-muted-foreground">Hang tight, we are preparing your content.</p>
+                          </div>
+                        </div>
+                        <div className="mt-4 space-y-3">
+                          <Progress value={activeStageProgress} className="h-2" />
+                          <div className="space-y-1">
+                            {activeStageList.map((stage, index) => (
+                              <div
+                                key={stage}
+                                className={`flex items-center gap-2 text-xs ${
+                                  index === activeStageIndex ? "text-foreground" : "text-muted-foreground"
+                                }`}
+                              >
+                                <span
+                                  className={`h-2 w-2 rounded-full ${
+                                    index <= activeStageIndex ? "bg-primary" : "bg-muted"
+                                  }`}
+                                />
+                                <span>{stage}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -1201,56 +1285,57 @@ const GeneratePage = () => {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Content Analysis</CardTitle>
-                  <CardDescription>Here's how your content scores across key metrics</CardDescription>
+                  <CardDescription>Review the details for this generation</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="grid gap-4">
-                    {[
-                      { label: "Clarity", score: analysis.clarityScore, description: "How easy your message is to understand" },
-                      { label: "Hook Strength", score: analysis.hookStrength, description: "How well the opening grabs attention" },
-                      { label: "Engagement", score: analysis.engagementScore, description: "Likelihood to spark interaction" },
-                      { label: "Structure", score: analysis.structureScore, description: "Logical flow and organization" },
-                    ].map((item, index) => (
-                      <motion.div
-                        key={item.label}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        className="space-y-2"
-                      >
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <p className="font-medium text-foreground">{item.label}</p>
-                            <p className="text-sm text-muted-foreground">{item.description}</p>
+                <CardContent>
+                  <div className="space-y-6">
+                    <div className="grid gap-4">
+                      {[
+                        { label: "Clarity", score: analysis.clarityScore, description: "How easy your message is to understand" },
+                        { label: "Hook Strength", score: analysis.hookStrength, description: "How well the opening grabs attention" },
+                        { label: "Engagement", score: analysis.engagementScore, description: "Likelihood to spark interaction" },
+                        { label: "Structure", score: analysis.structureScore, description: "Logical flow and organization" },
+                      ].map((item, index) => (
+                        <motion.div
+                          key={item.label}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.1 }}
+                          className="space-y-2"
+                        >
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <p className="font-medium text-foreground">{item.label}</p>
+                              <p className="text-sm text-muted-foreground">{item.description}</p>
+                            </div>
+                            <span className={`text-2xl font-bold ${
+                              item.score >= 80 ? "text-green-600 dark:text-green-400" :
+                              item.score >= 60 ? "text-primary" :
+                              "text-amber-600 dark:text-amber-400"
+                            }`}>{item.score}%</span>
                           </div>
-                          <span className={`text-2xl font-bold ${
-                            item.score >= 80 ? "text-green-600 dark:text-green-400" :
-                            item.score >= 60 ? "text-primary" :
-                            "text-amber-600 dark:text-amber-400"
-                          }`}>{item.score}%</span>
-                        </div>
-                        <Progress value={item.score} className="h-2" />
-                      </motion.div>
-                    ))}
-                  </div>
-                  
-                  {/* Strengths */}
-                  {analysis.strengths.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="font-medium text-foreground flex items-center gap-2">
-                        <Check className="h-4 w-4 text-green-600" />
-                        Strengths
-                      </p>
-                      <ul className="space-y-1.5">
-                        {analysis.strengths.map((strength, i) => (
-                          <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
-                            <span className="text-green-600 mt-1">•</span>
-                            {strength}
-                          </li>
-                        ))}
-                      </ul>
+                          <Progress value={item.score} className="h-2" />
+                        </motion.div>
+                      ))}
                     </div>
-                  )}
+
+                    {analysis.strengths.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="font-medium text-foreground flex items-center gap-2">
+                          <Check className="h-4 w-4 text-green-600" />
+                          Strengths
+                        </p>
+                        <ul className="space-y-1.5">
+                          {analysis.strengths.map((strength, i) => (
+                            <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
+                              <span className="text-green-600 mt-1">•</span>
+                              {strength}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
 
@@ -1259,8 +1344,15 @@ const GeneratePage = () => {
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Start Over
                 </Button>
-                <Button variant="hero" size="lg" onClick={() => setCurrentStep(3)}>
-                  See Improvements
+                <Button
+                  variant="hero"
+                  size="lg"
+                  onClick={() => {
+                    setOutputDetailTab("analysis");
+                    setCurrentStep(4);
+                  }}
+                >
+                  Back to Outputs
                   <ArrowRight className="h-5 w-5 ml-2" />
                 </Button>
               </div>
@@ -1310,8 +1402,15 @@ const GeneratePage = () => {
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Back
                 </Button>
-                <Button variant="hero" size="lg" onClick={() => setCurrentStep(4)}>
-                  View Outputs
+                <Button
+                  variant="hero"
+                  size="lg"
+                  onClick={() => {
+                    setOutputDetailTab("improvements");
+                    setCurrentStep(4);
+                  }}
+                >
+                  Back to Outputs
                   <ArrowRight className="h-5 w-5 ml-2" />
                 </Button>
               </div>
@@ -1354,96 +1453,192 @@ const GeneratePage = () => {
                   )}
                 </CardHeader>
                 <CardContent>
-                  <Tabs defaultValue={platformTabs[0]?.platform.toLowerCase()} className="w-full">
+                  <Tabs value={outputDetailTab} onValueChange={(value) => setOutputDetailTab(value as "content" | "analysis" | "improvements")}>
                     <TabsList className="w-full flex-wrap h-auto gap-1 bg-muted/50 p-1">
-                      {platformTabs.map((platform) => {
-                        const platformConfig = PLATFORM_CONFIG.find(
-                          p => platform.platform.toLowerCase().includes(p.id) || p.id.includes(platform.platform.toLowerCase())
-                        );
-                        return (
-                          <TabsTrigger
-                            key={platform.platform}
-                            value={platform.platform.toLowerCase()}
-                            className="flex-1 min-w-[80px] data-[state=active]:bg-background gap-1"
-                          >
-                            <span>{platformConfig?.icon || "📝"}</span>
-                            <span className="hidden sm:inline">{platformConfig?.label || platform.platform}</span>
-                          </TabsTrigger>
-                        );
-                      })}
+                      <TabsTrigger value="content" className="flex-1 min-w-[90px] data-[state=active]:bg-background">
+                        Content
+                      </TabsTrigger>
+                      <TabsTrigger value="analysis" className="flex-1 min-w-[90px] data-[state=active]:bg-background">
+                        Analysis
+                      </TabsTrigger>
+                      <TabsTrigger value="improvements" className="flex-1 min-w-[120px] data-[state=active]:bg-background">
+                        Improvements
+                      </TabsTrigger>
                     </TabsList>
 
-                    {platformTabs.map((platform) => {
-                      const platformKey = platform.platform.toLowerCase();
-                      return (
-                        <TabsContent key={platform.platform} value={platformKey} className="mt-4">
-                          <div className="grid gap-4 md:grid-cols-2">
-                            {outputVariants.map((variant) => {
-                              const variantOutput = getFilteredOutputs(variant.outputs).find(
-                                (output) => output.platform.toLowerCase() === platformKey
-                              );
-                              if (!variantOutput) return null;
+                    <TabsContent value="content" className="mt-4">
+                      <Tabs defaultValue={platformTabs[0]?.platform.toLowerCase()} className="w-full">
+                        <TabsList className="w-full flex-wrap h-auto gap-1 bg-muted/50 p-1">
+                          {platformTabs.map((platform) => {
+                            const platformConfig = PLATFORM_CONFIG.find(
+                              p => platform.platform.toLowerCase().includes(p.id) || p.id.includes(platform.platform.toLowerCase())
+                            );
+                            return (
+                              <TabsTrigger
+                                key={platform.platform}
+                                value={platform.platform.toLowerCase()}
+                                className="flex-1 min-w-[80px] data-[state=active]:bg-background gap-1"
+                              >
+                                <span>{platformConfig?.icon || "📝"}</span>
+                                <span className="hidden sm:inline">{platformConfig?.label || platform.platform}</span>
+                              </TabsTrigger>
+                            );
+                          })}
+                        </TabsList>
 
-                              const isSelected = selectedVariantByPlatform[platformKey] === variant.id;
-                              const copyKey = `${platformKey}:${variant.id}`;
+                        {platformTabs.map((platform) => {
+                          const platformKey = platform.platform.toLowerCase();
+                          return (
+                            <TabsContent key={platform.platform} value={platformKey} className="mt-4">
+                              <div className="grid gap-4 md:grid-cols-2">
+                                {outputVariants.map((variant) => {
+                                  const variantOutput = getFilteredOutputs(variant.outputs).find(
+                                    (output) => output.platform.toLowerCase() === platformKey
+                                  );
+                                  if (!variantOutput) return null;
 
-                              return (
-                                <motion.div
-                                  key={variant.id}
-                                  initial={{ opacity: 0, y: 10 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  className={`space-y-3 rounded-lg border p-4 ${isSelected ? "border-primary/60 bg-primary/5" : "border-muted"}`}
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-sm font-medium">{variant.label}</span>
-                                      {isSelected && <Badge variant="default">Selected</Badge>}
-                                    </div>
-                                    <Button
-                                      variant={isSelected ? "default" : "outline"}
-                                      size="sm"
-                                      onClick={() =>
-                                        setSelectedVariantByPlatform((prev) => ({
-                                          ...prev,
-                                          [platformKey]: variant.id,
-                                        }))
-                                      }
+                                  const isSelected = selectedVariantByPlatform[platformKey] === variant.id;
+                                  const copyKey = `${platformKey}:${variant.id}`;
+
+                                  return (
+                                    <motion.div
+                                      key={variant.id}
+                                      initial={{ opacity: 0, y: 10 }}
+                                      animate={{ opacity: 1, y: 0 }}
+                                      className={`space-y-3 rounded-lg border p-4 ${isSelected ? "border-primary/60 bg-primary/5" : "border-muted"}`}
                                     >
-                                      {isSelected ? "Using" : "Use this"}
-                                    </Button>
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-sm font-medium">{variant.label}</span>
+                                          {isSelected && <Badge variant="default">Selected</Badge>}
+                                        </div>
+                                        <Button
+                                          variant={isSelected ? "default" : "outline"}
+                                          size="sm"
+                                          onClick={() =>
+                                            setSelectedVariantByPlatform((prev) => ({
+                                              ...prev,
+                                              [platformKey]: variant.id,
+                                            }))
+                                          }
+                                        >
+                                          {isSelected ? "Using" : "Use this"}
+                                        </Button>
+                                      </div>
+                                      <div className="bg-muted/50 rounded-lg p-4 text-sm whitespace-pre-wrap font-mono leading-relaxed">
+                                        {variantOutput.content}
+                                      </div>
+                                      <div className="flex justify-between items-center">
+                                        <span className="text-sm text-muted-foreground">
+                                          {variantOutput.content.length} characters
+                                        </span>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => handleCopy(copyKey, variantOutput.content, platform.platform)}
+                                        >
+                                          {copiedPlatform === copyKey ? (
+                                            <>
+                                              <Check className="h-4 w-4 mr-2" />
+                                              Copied!
+                                            </>
+                                          ) : (
+                                            <>
+                                              <Copy className="h-4 w-4 mr-2" />
+                                              Copy
+                                            </>
+                                          )}
+                                        </Button>
+                                      </div>
+                                    </motion.div>
+                                  );
+                                })}
+                              </div>
+                            </TabsContent>
+                          );
+                        })}
+                      </Tabs>
+                    </TabsContent>
+
+                    <TabsContent value="analysis" className="mt-4">
+                      {analysis && (
+                        <div className="space-y-6">
+                          <div className="grid gap-4">
+                            {[
+                              { label: "Clarity", score: analysis.clarityScore, description: "How easy your message is to understand" },
+                              { label: "Hook Strength", score: analysis.hookStrength, description: "How well the opening grabs attention" },
+                              { label: "Engagement", score: analysis.engagementScore, description: "Likelihood to spark interaction" },
+                              { label: "Structure", score: analysis.structureScore, description: "Logical flow and organization" },
+                            ].map((item, index) => (
+                              <motion.div
+                                key={item.label}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: index * 0.08 }}
+                                className="space-y-2"
+                              >
+                                <div className="flex justify-between items-center">
+                                  <div>
+                                    <p className="font-medium text-foreground">{item.label}</p>
+                                    <p className="text-sm text-muted-foreground">{item.description}</p>
                                   </div>
-                                  <div className="bg-muted/50 rounded-lg p-4 text-sm whitespace-pre-wrap font-mono leading-relaxed">
-                                    {variantOutput.content}
-                                  </div>
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-sm text-muted-foreground">
-                                      {variantOutput.content.length} characters
-                                    </span>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => handleCopy(copyKey, variantOutput.content, platform.platform)}
-                                    >
-                                      {copiedPlatform === copyKey ? (
-                                        <>
-                                          <Check className="h-4 w-4 mr-2" />
-                                          Copied!
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Copy className="h-4 w-4 mr-2" />
-                                          Copy
-                                        </>
-                                      )}
-                                    </Button>
-                                  </div>
-                                </motion.div>
-                              );
-                            })}
+                                  <span className={`text-2xl font-bold ${
+                                    item.score >= 80 ? "text-green-600 dark:text-green-400" :
+                                    item.score >= 60 ? "text-primary" :
+                                    "text-amber-600 dark:text-amber-400"
+                                  }`}>{item.score}%</span>
+                                </div>
+                                <Progress value={item.score} className="h-2" />
+                              </motion.div>
+                            ))}
                           </div>
-                        </TabsContent>
-                      );
-                    })}
+
+                          {analysis.strengths.length > 0 && (
+                            <div className="space-y-2">
+                              <p className="font-medium text-foreground flex items-center gap-2">
+                                <Check className="h-4 w-4 text-green-600" />
+                                Strengths
+                              </p>
+                              <ul className="space-y-1.5">
+                                {analysis.strengths.map((strength, i) => (
+                                  <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
+                                    <span className="text-green-600 mt-1">•</span>
+                                    {strength}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="improvements" className="mt-4">
+                      {analysis && (
+                        <div className="space-y-4">
+                          {analysis.improvements.map((improvement, index) => (
+                            <motion.div
+                              key={index}
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: index * 0.08 }}
+                              className="flex items-start gap-3 p-4 rounded-lg bg-muted/50"
+                            >
+                              <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                                <Lightbulb className="h-3.5 w-3.5 text-primary" />
+                              </div>
+                              <p className="text-foreground">{improvement}</p>
+                            </motion.div>
+                          ))}
+
+                          <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 mt-4">
+                            <p className="text-sm text-muted-foreground">
+                              <strong className="text-foreground">Good news!</strong> We've already applied these improvements to your platform-ready outputs. You can post the content as-is or tweak it further.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </TabsContent>
                   </Tabs>
                 </CardContent>
               </Card>
@@ -1465,7 +1660,7 @@ const GeneratePage = () => {
               )}
 
               <div className="flex flex-col sm:flex-row sm:justify-between gap-3 mt-6">
-                <Button variant="outline" onClick={() => setCurrentStep(3)}>
+                <Button variant="outline" onClick={() => setCurrentStep(1)}>
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Back
                 </Button>
