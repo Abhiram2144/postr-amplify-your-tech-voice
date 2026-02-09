@@ -101,26 +101,56 @@ serve(async (req) => {
     if (!user?.email) throw new Error("User not authenticated or email not available");
     logStep("User authenticated", { userId: user.id });
 
+    const { data: stripeData } = await supabaseClient
+      .from("user_stripe_data")
+      .select("stripe_customer_id, stripe_subscription_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+    const customerId = customers.data[0]?.id || stripeData?.stripe_customer_id || null;
 
-    if (customers.data.length === 0) {
+    if (!customerId) {
       logStep("No customer found, returning free plan");
-      return new Response(JSON.stringify({ 
+
+      if (stripeData?.stripe_customer_id || stripeData?.stripe_subscription_id) {
+        await supabaseClient
+          .from("users")
+          .update({
+            plan: "free",
+            plan_started_at: null,
+            plan_expires_at: null,
+            monthly_generation_limit: 10,
+            monthly_video_limit: 2,
+          })
+          .eq("id", user.id);
+
+        await supabaseClient
+          .from("user_stripe_data")
+          .update({
+            stripe_subscription_id: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("user_id", user.id);
+      }
+
+      return new Response(JSON.stringify({
         subscribed: false,
         plan: "free",
-        subscription_end: null
+        subscription_end: null,
+        cancelling_at: null
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       });
     }
 
-    const customerId = customers.data[0].id;
+    const customerIdValue = customerId;
     logStep("Found Stripe customer");
 
     const subscriptions = await stripe.subscriptions.list({
-      customer: customerId,
+      customer: customerIdValue,
       status: "active",
       limit: 1,
     });
@@ -183,7 +213,7 @@ serve(async (req) => {
         .from("user_stripe_data")
         .upsert({
           user_id: user.id,
-          stripe_customer_id: customerId,
+          stripe_customer_id: customerIdValue,
           stripe_subscription_id: subscriptionId,
           updated_at: new Date().toISOString()
         }, { onConflict: "user_id" });
@@ -191,6 +221,27 @@ serve(async (req) => {
       logStep("Updated user record and stripe data", { plan });
     } else {
       logStep("No active subscription found");
+
+      if (stripeData?.stripe_customer_id || stripeData?.stripe_subscription_id) {
+        await supabaseClient
+          .from("users")
+          .update({
+            plan: "free",
+            plan_started_at: null,
+            plan_expires_at: null,
+            monthly_generation_limit: 10,
+            monthly_video_limit: 2,
+          })
+          .eq("id", user.id);
+
+        await supabaseClient
+          .from("user_stripe_data")
+          .update({
+            stripe_subscription_id: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("user_id", user.id);
+      }
     }
 
     return new Response(JSON.stringify({
