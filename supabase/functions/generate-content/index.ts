@@ -276,45 +276,74 @@ serve(async (req) => {
     const planTier = userPlan.includes("pro") ? "pro" : userPlan.includes("creator") ? "creator" : "free";
     logStep("Plan tier for generation", { planTier });
 
-    // Plan-specific analysis depth instructions
-    const analysisDepthByPlan: Record<string, string> = {
+        // Plan-specific analysis depth instructions
+        const analysisDepthByPlan: Record<string, string> = {
       free: `Provide basic analysis:
-- Give scores as rough estimates (clarity, hook, engagement, structure)
-- List exactly 2 strengths and 2 improvements
-- Keep feedback concise and general`,
+    - Give scores as rough estimates (clarity, hook, engagement, structure)
+    - List exactly 2 strengths and 2 improvements
+    - Keep analysis short and conversational
+    - Use plain language; avoid technical or psychological terms`,
       creator: `Provide advanced analysis:
-- Give accurate, detailed scores (clarity, hook, engagement, structure)
-- List exactly 3 strengths and 3 improvements with specific examples
-- Include actionable suggestions referencing the actual content
-- Explain WHY each score is what it is`,
+    - Give accurate, detailed scores (clarity, hook, engagement, structure)
+    - List exactly 3 strengths and 3 improvements with specific examples
+    - Include actionable suggestions referencing the actual content
+    - Explain WHY each score is what it is
+    - Reference specific lines or ideas and explain feedback like peer-to-peer advice`,
       pro: `Provide deep, expert-level analysis:
-- Give precise scores with justification (clarity, hook, engagement, structure)
-- List exactly 5 strengths and 5 improvements with specific, actionable examples
-- Include psychological engagement tactics (curiosity gaps, pattern interrupts, open loops)
-- Reference platform algorithm preferences and trending formats
-- Suggest A/B testing variations for hooks
-- Analyze emotional triggers and audience retention patterns`,
-    };
+    - Give precise scores with justification (clarity, hook, engagement, structure)
+    - List exactly 5 strengths and 5 improvements with specific, actionable examples
+    - Include psychological engagement tactics (curiosity gaps, pattern interrupts, open loops)
+    - Reference platform algorithm preferences and trending formats
+    - Suggest A/B testing variations for hooks
+    - Analyze emotional triggers and audience retention patterns
+    - Write analysis like private notes between strategists; be direct and assume nuance`,
+        };
 
-    // Plan-specific content quality instructions
-    const contentQualityByPlan: Record<string, string> = {
-      free: `Generate solid, functional content for each platform. Focus on clarity and basic engagement.`,
-      creator: `Generate high-quality, optimized content for each platform. Use proven engagement patterns, strong hooks, strategic formatting, and platform-native language. Make each post feel crafted, not generated.`,
-      pro: `Generate premium, expert-crafted content for each platform. Apply:
-- Psychological hooks (curiosity gaps, pattern interrupts, contrarian takes)
-- Platform-specific algorithm optimization (LinkedIn: dwell time; Twitter: quote-tweet bait; Instagram: save-worthy formatting)
-- Narrative arcs even in short-form content
-- Strategic emoji and formatting for maximum visual hierarchy
-- Engagement triggers (hot takes, thought-provoking questions, relatable pain points)
-- Each post should feel like it was written by a top 1% creator on that platform`,
-    };
+        // Plan-specific content quality instructions
+        const contentQualityByPlan: Record<string, string> = {
+      free: `Write clear, readable content that gets the point across.
+
+    Priorities:
+    - Sound human and casual
+    - Avoid dramatic hooks or exaggerated claims
+    - Prefer plain language over clever wording
+    - Focus on being understandable, not impressive
+
+    The result should feel like something a smart student or early creator would post: useful, but not engineered.`,
+      creator: `Create high-quality, platform-native content that feels intentionally written.
+
+    Guidelines:
+    - Strong opening lines, but no clickbait
+    - Clear point of view
+    - Natural transitions between ideas
+    - Formatting that improves readability without drawing attention to itself
+    - Language that sounds like a real person who has learned through experience
+
+    Avoid generic advice, filler phrases, and creator cliches.
+    If a sentence sounds like it could apply to any topic, rewrite it.`,
+      pro: `Create premium content that feels authored, not generated.
+
+    Apply:
+    - Subtle curiosity gaps (imply insight, do not announce it)
+    - Pattern interrupts that feel natural, not gimmicky
+    - Specific observations instead of general advice
+    - Emotional awareness without emotional manipulation
+
+    Avoid:
+    - Motivational language
+    - Buzzwords
+    - Obvious hooks
+    - Over-formatting
+
+    Do not try to sound impressive. Try to sound certain.`,
+        };
 
     // Construct the prompt based on mode
     let contentPrompt: string;
     
     if (mode === "brief_topic") {
       contentPrompt = `
-You are a content creation expert. Create engaging social media content based on this brief:
+You are creating social media content based on the following brief:
 
 Topic: ${topic}
 Target Audience: ${audience || "General audience"}
@@ -384,12 +413,33 @@ Your tasks:
       .map(p => PLATFORM_INSTRUCTIONS[p.toLowerCase()] || `Format for ${p}: Create platform-appropriate content.`)
       .join("\n\n");
 
-    // Full system prompt - differentiated by plan
-    const systemPromptByPlan: Record<string, string> = {
-      free: `You are a helpful social media content creator. Provide clear, functional content and basic analysis.`,
-      creator: `You are an expert social media content creator and analyst. You understand platform algorithms, engagement patterns, and what makes content perform well. Provide detailed, actionable analysis and high-quality, platform-native content. Tailor everything to the specific topic and audience.`,
-      pro: `You are an elite social media strategist trusted by top creators and brands. You have deep expertise in platform algorithms, viral mechanics, psychological engagement triggers, and audience growth. You write content that consistently outperforms — using curiosity gaps, pattern interrupts, contrarian framing, and emotional resonance. Your analysis is surgical and your content is indistinguishable from top 1% creators. Never be generic. Every word must earn its place.`,
-    };
+        // Full system prompt - differentiated by plan
+        const systemPromptByPlan: Record<string, string> = {
+      free: `You are a helpful junior content creator.
+
+    You write clearly and naturally, like a real person explaining something they understand.
+    You avoid buzzwords, hype language, and marketing jargon.
+    Your writing should feel simple, honest, and straightforward, never polished to perfection.
+
+    Do not over-optimize.
+    Do not sound like a coach, strategist, or expert.
+    If something is obvious, say it simply and move on.`,
+      creator: `You are an experienced content creator who understands what works because you have posted consistently.
+
+    You write with intention, not hype.
+    You care about structure, flow, and readability.
+    You know platform norms and follow them naturally without explaining them.
+
+    Your writing should feel crafted, but not polished to the point of sounding artificial.
+    You are confident, not loud.`,
+      pro: `You are a senior content strategist who writes with intent and restraint.
+
+    You have strong opinions and you are comfortable implying them without spelling everything out.
+    You think in terms of audience psychology, retention, and attention, but you never explain this explicitly.
+
+    Your writing should feel confident but not promotional, insightful without sounding instructional, sharp, slightly opinionated, and deliberate.
+    Nothing you write should feel generic or safe. If a sentence does not add leverage, remove it.`,
+        };
 
     const fullPrompt = `${contentPrompt}
 
