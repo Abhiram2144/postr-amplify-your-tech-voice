@@ -11,15 +11,15 @@ const productLinks = [
 ];
 
 const companyLinks = [
-  { label: "About", href: "#", isRoute: false },
-  { label: "Blog", href: "#", isRoute: false },
-  { label: "Careers", href: "#", isRoute: false },
-  { label: "Contact", href: "#", isRoute: false },
+  { label: "About", href: "/about", isRoute: true },
+  { label: "Blog", href: "/blog", isRoute: true },
+  { label: "Careers", href: "/careers", isRoute: true },
+  { label: "Contact", href: "/contact", isRoute: true },
 ];
 
 const legalLinks = [
-  { label: "Privacy", href: "#", isRoute: false },
-  { label: "Terms", href: "#", isRoute: false },
+  { label: "Privacy", href: "/privacy", isRoute: true },
+  { label: "Terms", href: "/terms", isRoute: true },
 ];
 
 const Footer = () => {
