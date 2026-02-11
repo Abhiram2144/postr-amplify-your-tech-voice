@@ -6,7 +6,7 @@ import BeforeAfterSection from "@/components/landing/BeforeAfterSection";
 import BenefitsSection from "@/components/landing/BenefitsSection";
 import FeaturesSection from "@/components/landing/FeaturesSection";
 import ComparisonSection from "@/components/landing/ComparisonSection";
-import UseCasesSection from "@/components/landing/UseCasesSection";
+
 import CTASection from "@/components/landing/CTASection";
 import Footer from "@/components/landing/Footer";
 
@@ -22,7 +22,7 @@ const Index = () => {
         <BenefitsSection />
         <FeaturesSection />
         <ComparisonSection />
-        <UseCasesSection />
+        
         <CTASection />
       </main>
       <Footer />
