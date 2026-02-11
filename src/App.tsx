@@ -10,7 +10,7 @@ import { CreditsProvider } from "@/hooks/useCredits";
 import ScrollToTop from "@/components/ScrollToTop";
 import Index from "./pages/Index";
 import Product from "./pages/Product";
-import UseCases from "./pages/UseCases";
+
 import Pricing from "./pages/Pricing";
 import Docs from "./pages/Docs";
 import Login from "./pages/Login";
@@ -56,7 +56,7 @@ const App = () => (
                   <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/product" element={<Product />} />
-                <Route path="/use-cases" element={<UseCases />} />
+                
                 <Route path="/pricing" element={<Pricing />} />
                 <Route path="/docs" element={<Docs />} />
                 <Route path="/login" element={<Login />} />
