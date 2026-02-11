@@ -133,24 +133,29 @@ const FeaturesSection = () => {
               </div>
             </div>
 
-            {/* Right Side — Scrolling Content */}
+            {/* Right Side — Vertical Scroll Cards */}
             <div className="relative flex items-center lg:w-[55%]">
-              <div className="relative w-full">
+              <div className="relative w-full overflow-hidden" style={{ minHeight: 360 }}>
                 {useCases.map((useCase, index) => {
                   const isActive = index === activeIndex;
+                  const isPast = index < activeIndex;
                   const Icon = useCase.icon;
+
+                  // Past cards slide up and fade out, future cards wait below
+                  const yOffset = isPast ? -80 : isActive ? 0 : 80;
+                  const opacity = isActive ? 1 : 0;
 
                   return (
                     <motion.div
                       key={useCase.title}
                       initial={false}
                       animate={{
-                        opacity: isActive ? 1 : 0,
-                        y: isActive ? 0 : 30,
-                        scale: isActive ? 1 : 0.96,
+                        opacity,
+                        y: yOffset,
+                        scale: isActive ? 1 : 0.94,
                         pointerEvents: isActive ? "auto" : "none",
                       }}
-                      transition={{ duration: 0.5, ease: "easeOut" }}
+                      transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
                       className="absolute inset-0 flex items-start"
                       style={{ position: index === 0 ? "relative" : "absolute" }}
                     >
@@ -189,11 +194,11 @@ const FeaturesSection = () => {
                                 initial={false}
                                 animate={{
                                   opacity: isActive ? 1 : 0,
-                                  x: isActive ? 0 : 15,
+                                  y: isActive ? 0 : 12,
                                 }}
                                 transition={{
-                                  duration: 0.4,
-                                  delay: isActive ? i * 0.06 : 0,
+                                  duration: 0.35,
+                                  delay: isActive ? i * 0.05 : 0,
                                   ease: "easeOut",
                                 }}
                                 className="flex items-center gap-2.5 text-sm text-foreground"
