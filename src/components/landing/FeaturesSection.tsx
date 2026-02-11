@@ -74,6 +74,8 @@ const FeaturesSection = () => {
     offset: ["start start", "end end"],
   });
 
+  const cardsParallaxY = useTransform(scrollYProgress, [0, 1], [24, -24]);
+
   useMotionValueEvent(scrollYProgress, "change", (latest) => {
     const sectionCount = useCases.length;
     const index = Math.min(
@@ -135,7 +137,10 @@ const FeaturesSection = () => {
 
             {/* Right Side — Vertical Scroll Cards */}
             <div className="relative flex items-center lg:w-[55%]">
-              <div className="relative w-full overflow-hidden" style={{ minHeight: 360 }}>
+              <motion.div
+                className="relative w-full overflow-hidden"
+                style={{ minHeight: 360, y: cardsParallaxY }}
+              >
                 {useCases.map((useCase, index) => {
                   const isActive = index === activeIndex;
                   const isPast = index < activeIndex;
@@ -213,7 +218,7 @@ const FeaturesSection = () => {
                     </motion.div>
                   );
                 })}
-              </div>
+              </motion.div>
             </div>
           </div>
         </div>
