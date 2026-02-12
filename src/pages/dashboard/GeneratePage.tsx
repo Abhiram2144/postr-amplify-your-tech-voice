@@ -571,6 +571,15 @@ const GeneratePage = () => {
       return;
     }
 
+    if (!session?.access_token) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in again to process videos.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsProcessing(true);
     setVideoProcessingStep("validating");
 
