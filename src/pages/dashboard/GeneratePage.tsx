@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { useOutletContext, useSearchParams } from "react-router-dom";
+import { useOutletContext, useSearchParams, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -37,14 +37,14 @@ import { useToast } from "@/hooks/use-toast";
 import InsufficientCreditsModal from "@/components/dashboard/InsufficientCreditsModal";
 import CreditsIndicator from "@/components/dashboard/CreditsIndicator";
 import type { UserProfile } from "@/components/dashboard/DashboardLayout";
-import { isValidVideoUrl, isValidVideoFile, detectVideoPlatform, getPlatformDisplayName } from "@/lib/video-utils";
+import { isValidVideoFile } from "@/lib/video-utils";
 
 interface DashboardContext {
   profile: UserProfile | null;
 }
 
 type Step = 1 | 2 | 3 | 4;
-type CreationMode = "brief_topic" | "script" | "video" | "video_upload";
+type CreationMode = "brief_topic" | "script" | "video_upload";
 
 const steps = [
   { number: 1, name: "Input", icon: FileText },
@@ -57,13 +57,43 @@ const AUDIENCE_OPTIONS = ["Students", "Founders", "Professionals", "General audi
 const INTENT_OPTIONS = ["Explain", "Teach", "Share an opinion", "Tell a story"];
 const TONE_OPTIONS = ["Educational", "Casual", "Bold", "Story-driven"];
 
+// Platform logos
+const LinkedInIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className || "h-5 w-5"} fill="currentColor">
+    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+  </svg>
+);
+
+const XIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className || "h-5 w-5"} fill="currentColor">
+    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+  </svg>
+);
+
+const ThreadsIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 192 192" className={className || "h-5 w-5"} fill="currentColor">
+    <path d="M141.537 88.988a66.667 66.667 0 0 0-2.518-1.143c-1.482-27.307-16.403-42.94-41.457-43.1h-.398c-15.09 0-27.632 6.497-35.302 18.27l13.186 9.045c5.706-8.667 14.468-12.876 26.116-12.876h.282c10.122.062 17.763 3.004 22.705 8.74 3.594 4.174 5.991 9.878 7.18 17.081a83.793 83.793 0 0 0-22.364-2.742c-26.118 0-42.884 13.752-43.643 35.777-.394 11.48 4.23 22.306 13.021 30.475 8.331 7.74 19.205 11.802 30.616 11.426 15.09-.497 26.89-6.258 35.063-17.12 6.21-8.253 10.083-18.815 11.596-31.683 6.937 4.193 12.08 9.743 14.805 16.545 4.612 11.518 4.882 30.46-9.478 44.82-12.613 12.613-27.771 18.087-50.744 18.26-25.476-.192-44.735-8.374-57.26-24.328-11.69-14.89-17.734-36.03-17.963-62.829.229-26.8 6.273-47.94 17.963-62.83C62.527 19.373 81.786 11.19 107.262 11c25.632.192 45.095 8.474 57.848 24.62 6.254 7.914 10.98 17.608 14.08 28.67l15.378-4.148c-3.652-13.02-9.449-24.582-17.298-34.51C161.182 5.846 137.543-3.755 107.158-4h-.208c-30.22.244-53.666 9.83-69.678 28.5C21.778 42.548 14.063 68.147 13.776 99.86v.28c.287 31.712 8.002 57.312 23.496 75.36 16.012 18.67 39.458 28.256 69.678 28.5h.208c27.263-.193 46.696-7.24 63.007-22.815 20.892-19.946 20.04-45.062 13.478-61.463-4.708-11.775-14.015-21.317-26.96-27.738-.054-.027-.11-.05-.146-.068Zm-49.146 55.755c-12.656.417-25.849-4.96-26.163-17.087-.233-9.024 6.39-19.138 28.238-19.138 2.5 0 4.9.127 7.19.364 5.108.529 9.912 1.533 14.366 2.958-1.632 22.597-12.466 32.464-23.631 32.903Z" />
+  </svg>
+);
+
+const RedditIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className || "h-5 w-5"} fill="currentColor">
+    <path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z" />
+  </svg>
+);
+
+const InstagramIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className || "h-5 w-5"} fill="currentColor">
+    <path d="M12 0C8.74 0 8.333.015 7.053.072 5.775.132 4.905.333 4.14.63c-.789.306-1.459.717-2.126 1.384S.935 3.35.63 4.14C.333 4.905.131 5.775.072 7.053.012 8.333 0 8.74 0 12s.015 3.667.072 4.947c.06 1.277.261 2.148.558 2.913.306.788.717 1.459 1.384 2.126.667.666 1.336 1.079 2.126 1.384.766.296 1.636.499 2.913.558C8.333 23.988 8.74 24 12 24s3.667-.015 4.947-.072c1.277-.06 2.148-.262 2.913-.558.788-.306 1.459-.718 2.126-1.384.666-.667 1.079-1.335 1.384-2.126.296-.765.499-1.636.558-2.913.06-1.28.072-1.687.072-4.947s-.015-3.667-.072-4.947c-.06-1.277-.262-2.149-.558-2.913-.306-.789-.718-1.459-1.384-2.126C21.319 1.347 20.651.935 19.86.63c-.765-.297-1.636-.499-2.913-.558C15.667.012 15.26 0 12 0zm0 2.16c3.203 0 3.585.016 4.85.071 1.17.055 1.805.249 2.227.415.562.217.96.477 1.382.896.419.42.679.819.896 1.381.164.422.36 1.057.413 2.227.057 1.266.07 1.646.07 4.85s-.015 3.585-.074 4.85c-.061 1.17-.256 1.805-.421 2.227-.224.562-.479.96-.899 1.382-.419.419-.824.679-1.38.896-.42.164-1.065.36-2.235.413-1.274.057-1.649.07-4.859.07-3.211 0-3.586-.015-4.859-.074-1.171-.061-1.816-.256-2.236-.421-.569-.224-.96-.479-1.379-.899-.421-.419-.69-.824-.9-1.38-.165-.42-.359-1.065-.42-2.235-.045-1.26-.061-1.649-.061-4.844 0-3.196.016-3.586.061-4.861.061-1.17.255-1.814.42-2.234.21-.57.479-.96.9-1.381.419-.419.81-.689 1.379-.898.42-.166 1.051-.361 2.221-.421 1.275-.045 1.65-.06 4.859-.06l.045.03zm0 3.678c-3.405 0-6.162 2.76-6.162 6.162 0 3.405 2.76 6.162 6.162 6.162 3.405 0 6.162-2.76 6.162-6.162 0-3.405-2.757-6.162-6.162-6.162zM12 16c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm7.846-10.405c0 .795-.646 1.44-1.44 1.44-.795 0-1.44-.646-1.44-1.44 0-.794.646-1.439 1.44-1.439.793-.001 1.44.645 1.44 1.439z" />
+  </svg>
+);
+
 const PLATFORM_CONFIG = [
-  { id: "linkedin", label: "LinkedIn", icon: "💼" },
-  { id: "instagram", label: "Instagram", icon: "📸" },
-  { id: "twitter", label: "Twitter/X", icon: "🐦" },
-  { id: "youtube", label: "YouTube Shorts", icon: "🎬" },
-  { id: "threads", label: "Threads", icon: "🧵" },
-  { id: "reddit", label: "Reddit", icon: "🤖" },
+  { id: "linkedin", label: "LinkedIn", icon: LinkedInIcon },
+  { id: "instagram", label: "Instagram", icon: InstagramIcon },
+  { id: "twitter", label: "Twitter/X", icon: XIcon },
+  { id: "threads", label: "Threads", icon: ThreadsIcon },
+  { id: "reddit", label: "Reddit", icon: RedditIcon },
 ];
 
 const TEXT_GENERATION_STAGES = [
@@ -200,54 +230,7 @@ type GenerateResponse = {
   };
 };
 
-// YouTube Shorts context types
-interface VideoContext {
-  source_platform: "youtube_shorts";
-  video_id: string;
-  video_title: string;
-  video_description: string;
-  hashtags: string[];
-  transcript: string;
-  video_length_seconds: number;
-  channel_name: string;
-  view_count: number;
-  published_at: string;
-}
 
-interface VideoIntent {
-  intent: "educate" | "explain" | "inspire" | "sell" | "entertain";
-  target_audience: string;
-  tone: "educational" | "casual" | "bold" | "story-driven";
-  core_message: string;
-  key_takeaways: string[];
-}
-
-interface VideoProcessingResult {
-  context: VideoContext;
-  intent: VideoIntent;
-  metadata: {
-    videoId: string;
-    title: string;
-    channel: string;
-    duration: number;
-    views: number;
-    transcriptLength: number;
-    transcriptConfidence: number;
-  };
-}
-
-type VideoProcessingStep = "idle" | "validating" | "fetching_metadata" | "transcribing" | "analyzing" | "generating" | "complete" | "error";
-
-const VIDEO_GENERATION_STAGES: Record<VideoProcessingStep, string> = {
-  idle: "Preparing video analysis",
-  validating: "Validating video URL",
-  fetching_metadata: "Fetching video metadata",
-  transcribing: "Transcribing audio",
-  analyzing: "Analyzing creator intent",
-  generating: "Generating platform content",
-  complete: "Finalizing results",
-  error: "Processing failed",
-};
 
 // Upload processing steps
 type UploadProcessingStep = "idle" | "uploading" | "transcribing" | "understanding" | "generating" | "complete" | "error";
@@ -289,7 +272,7 @@ const GeneratePage = () => {
 
   const initialProjectId = searchParams.get("projectId");
   const initialText = searchParams.get("text");
-  
+
   // UI State
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [creationMode, setCreationMode] = useState<CreationMode>("brief_topic");
@@ -305,25 +288,17 @@ const GeneratePage = () => {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(initialProjectId);
   const [projectOptions, setProjectOptions] = useState<Array<{ id: string; title: string | null }>>([]);
   const [projectsLoading, setProjectsLoading] = useState(false);
-  
+
   // Brief Topic Mode Inputs
   const [topic, setTopic] = useState("");
   const [audience, setAudience] = useState("");
   const [intent, setIntent] = useState("");
   const [tone, setTone] = useState("");
-  
+
   // Script Mode Input
   const [scriptText, setScriptText] = useState("");
-  
-  // Video Mode Inputs
-  const [videoUrl, setVideoUrl] = useState("");
-  const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [videoInputMethod, setVideoInputMethod] = useState<"url" | "upload">("url");
-  const [videoProcessingStep, setVideoProcessingStep] = useState<VideoProcessingStep>("idle");
-  const [videoContext, setVideoContext] = useState<VideoContext | null>(null);
-  const [videoIntent, setVideoIntent] = useState<VideoIntent | null>(null);
-  const [videoMetadata, setVideoMetadata] = useState<VideoProcessingResult["metadata"] | null>(null);
-  
+
+
   // Video Upload Mode Inputs
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadProcessingStep, setUploadProcessingStep] = useState<UploadProcessingStep>("idle");
@@ -334,7 +309,7 @@ const GeneratePage = () => {
 
   // Platforms come from user profile (set during onboarding or in settings) - not selectable here
   const userPlatforms = profile?.platforms || ["linkedin", "twitter"];
-  
+
   // Results
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [outputs, setOutputs] = useState<PlatformOutput[]>([]);
@@ -381,7 +356,7 @@ const GeneratePage = () => {
   }, [user?.id]);
 
   useEffect(() => {
-    if (!isProcessing || currentStep !== 1 || creationMode === "video" || creationMode === "video_upload") return;
+    if (!isProcessing || currentStep !== 1 || creationMode === "video_upload") return;
     setTextStageIndex(0);
     const intervalId = window.setInterval(() => {
       setTextStageIndex((prev) => (prev + 1) % TEXT_GENERATION_STAGES.length);
@@ -452,18 +427,12 @@ const GeneratePage = () => {
       if (userPlatforms.length === 0) return false;
       if (creationMode === "brief_topic") return topic.trim().length >= 3;
       if (creationMode === "script") return scriptText.trim().length >= 50;
-      if (creationMode === "video") {
-        if (videoInputMethod === "url") {
-          return videoUrl.trim().length > 0 && isValidVideoUrl(videoUrl);
-        }
-        return videoFile !== null;
-      }
       if (creationMode === "video_upload") {
         return uploadFile !== null;
       }
     }
     return true;
-  }, [currentStep, creationMode, topic, scriptText, userPlatforms.length, videoInputMethod, videoUrl, videoFile, uploadFile]);
+  }, [currentStep, creationMode, topic, scriptText, userPlatforms.length, uploadFile]);
 
   const persistOutputs = async (projectId: string | null, payload: { analysis: AnalysisResult; outputs: PlatformOutput[] }, source: 'ai' | 'mock' | 'video_transcript' = 'ai') => {
     if (!projectId) return;
@@ -504,7 +473,7 @@ const GeneratePage = () => {
 
   const handleGenerate = async (append = false) => {
     // Check credits for text generation (skip if testing mode enabled)
-    if (!testingMode && creationMode !== "video" && creationMode !== "video_upload" && creditsRemaining <= 0) {
+    if (!testingMode && creationMode !== "video_upload" && creditsRemaining <= 0) {
       setShowCreditsModal(true);
       return;
     }
@@ -529,11 +498,7 @@ const GeneratePage = () => {
       return;
     }
 
-    // Real video mode - YouTube Shorts Intelligence
-    if (creationMode === "video" && !testingMode) {
-      await handleVideoGeneration(append);
-      return;
-    }
+
 
     // Real video upload mode
     if (creationMode === "video_upload" && !testingMode) {
@@ -575,17 +540,17 @@ const GeneratePage = () => {
       })();
 
       addOutputVariant({ analysis: generated.analysis, outputs: generated.outputs }, append);
-      
+
       if (!testingMode && generated.credits?.used !== undefined) {
         updateCreditsAfterGeneration(generated.credits.used);
       }
-      
+
       if (append) {
         setHasGeneratedAnother(true);
       }
       setOutputDetailTab("content");
       setCurrentStep(4);
-      
+
       toast({
         title: append ? "Another version generated" : "Content Generated!",
         description: append
@@ -609,119 +574,7 @@ const GeneratePage = () => {
     }
   };
 
-  // YouTube Shorts Intelligence Mode handler
-  const handleVideoGeneration = async (append = false) => {
-    if (!videoUrl || !isValidVideoUrl(videoUrl)) {
-      toast({
-        title: "Invalid URL",
-        description: "Please enter a valid YouTube Shorts URL",
-        variant: "destructive",
-      });
-      return;
-    }
 
-    if (!session?.access_token) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in again to process videos.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsProcessing(true);
-    setVideoProcessingStep("validating");
-
-    try {
-      // Step 1: Process video - fetch metadata and transcription
-      setVideoProcessingStep("fetching_metadata");
-      
-      const { data: videoData, error: videoError } = await supabase.functions.invoke("process-youtube-shorts", {
-        body: { videoUrl },
-        headers: {
-          Authorization: `Bearer ${session?.access_token}`,
-        },
-      });
-
-      if (videoError) throw videoError;
-      if (videoData.error) throw new Error(videoData.error);
-
-      setVideoProcessingStep("transcribing");
-      
-      // Store the video context and intent
-      const processedContext = videoData.context as VideoContext;
-      const processedIntent = videoData.intent as VideoIntent;
-      const processedMetadata = videoData.metadata as VideoProcessingResult["metadata"];
-      
-      setVideoContext(processedContext);
-      setVideoIntent(processedIntent);
-      setVideoMetadata(processedMetadata);
-
-      setVideoProcessingStep("generating");
-
-      // Step 2: Generate content using enriched context
-      const { data: genData, error: genError } = await supabase.functions.invoke("generate-content", {
-        body: {
-          mode: "video",
-          platforms: userPlatforms,
-          video_context: processedContext,
-          video_intent: processedIntent,
-        },
-        headers: {
-          Authorization: `Bearer ${session?.access_token}`,
-        },
-      });
-
-      if (genError) throw genError;
-      if (genData.error === "insufficient_credits") {
-        setShowCreditsModal(true);
-        throw new Error("insufficient_credits");
-      }
-      if (genData.error) throw new Error(genData.error);
-
-      setVideoProcessingStep("complete");
-
-      addOutputVariant({ 
-        analysis: genData.analysis as AnalysisResult, 
-        outputs: genData.outputs as PlatformOutput[] 
-      }, append);
-      
-      if (genData.credits?.used !== undefined) {
-        updateCreditsAfterGeneration(genData.credits.used);
-      }
-
-      if (append) {
-        setHasGeneratedAnother(true);
-      }
-      setOutputDetailTab("content");
-      setCurrentStep(4);
-      
-      toast({
-        title: append ? "Another version generated" : "Video Analyzed & Content Generated!",
-        description: append
-          ? "Select your preferred version per platform, then save."
-          : `Analyzed "${processedMetadata.title}" (${processedMetadata.duration}s). ${genData.credits?.remaining ?? creditsRemaining - 1} credits remaining.`,
-      });
-
-    } catch (error) {
-      console.error("Video generation error:", error);
-      setVideoProcessingStep("error");
-
-      if (error instanceof Error && error.message === "insufficient_credits") {
-        return;
-      }
-
-      toast({
-        title: "Video Processing Failed",
-        description: error instanceof Error ? error.message : "Could not process the video. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsProcessing(false);
-      // Reset step after a delay
-      setTimeout(() => setVideoProcessingStep("idle"), 3000);
-    }
-  };
 
   // Video Upload Intelligence Mode handler
   const handleVideoUploadGeneration = async (append = false) => {
@@ -958,8 +811,8 @@ const GeneratePage = () => {
 
 
   const getFilteredOutputs = (variantOutputs: PlatformOutput[]) => {
-    return variantOutputs.filter(o => 
-      userPlatforms.some(sp => 
+    return variantOutputs.filter(o =>
+      userPlatforms.some(sp =>
         o.platform.toLowerCase().includes(sp.toLowerCase()) ||
         sp.toLowerCase().includes(o.platform.toLowerCase())
       )
@@ -1007,26 +860,17 @@ const GeneratePage = () => {
   };
 
   const platformTabs = getAllPlatforms();
-  const videoStageOrder: VideoProcessingStep[] = ["validating", "fetching_metadata", "transcribing", "analyzing", "generating", "complete"];
   const uploadStageOrder: UploadProcessingStep[] = ["uploading", "transcribing", "understanding", "generating", "complete"];
-  const currentVideoStageIndex = Math.max(0, videoStageOrder.indexOf(videoProcessingStep));
   const currentUploadStageIndex = Math.max(0, uploadStageOrder.indexOf(uploadProcessingStep));
-  const activeStageList = creationMode === "video"
-    ? videoStageOrder.map((stage) => VIDEO_GENERATION_STAGES[stage])
-    : creationMode === "video_upload"
+  const activeStageList = creationMode === "video_upload"
     ? uploadStageOrder.map((stage) => UPLOAD_GENERATION_STAGES[stage])
     : TEXT_GENERATION_STAGES;
-  const activeStageIndex = creationMode === "video" ? currentVideoStageIndex
-    : creationMode === "video_upload" ? currentUploadStageIndex
+  const activeStageIndex = creationMode === "video_upload" ? currentUploadStageIndex
     : textStageIndex;
-  const activeStageLabel = creationMode === "video"
-    ? VIDEO_GENERATION_STAGES[videoProcessingStep]
-    : creationMode === "video_upload"
+  const activeStageLabel = creationMode === "video_upload"
     ? UPLOAD_GENERATION_STAGES[uploadProcessingStep]
     : TEXT_GENERATION_STAGES[textStageIndex];
-  const activeStageProgress = creationMode === "video"
-    ? ((currentVideoStageIndex + 1) / videoStageOrder.length) * 100
-    : creationMode === "video_upload"
+  const activeStageProgress = creationMode === "video_upload"
     ? ((currentUploadStageIndex + 1) / uploadStageOrder.length) * 100
     : ((textStageIndex + 1) / TEXT_GENERATION_STAGES.length) * 100;
 
@@ -1050,10 +894,10 @@ const GeneratePage = () => {
               </Badge>
             )}
             <CreditsIndicator
-              label={creationMode === "video" ? "Video credits" : "Text credits"}
-              used={creationMode === "video" ? videoCreditsUsed : undefined}
-              limit={creationMode === "video" ? videoCreditsLimit : undefined}
-              remaining={creationMode === "video" ? videoCreditsRemaining : undefined}
+              label={creationMode === "video_upload" ? "Video credits" : "Text credits"}
+              used={creationMode === "video_upload" ? videoCreditsUsed : undefined}
+              limit={creationMode === "video_upload" ? videoCreditsLimit : undefined}
+              remaining={creationMode === "video_upload" ? videoCreditsRemaining : undefined}
             />
             <Button
               variant="outline"
@@ -1091,9 +935,8 @@ const GeneratePage = () => {
                       backgroundColor: isCompleted || isActive ? "hsl(var(--primary))" : "hsl(var(--muted))",
                     }}
                     transition={{ duration: 0.2 }}
-                    className={`h-10 w-10 rounded-full flex items-center justify-center z-10 ${
-                      isCompleted || isActive ? "text-primary-foreground" : "text-muted-foreground"
-                    }`}
+                    className={`h-10 w-10 rounded-full flex items-center justify-center z-10 ${isCompleted || isActive ? "text-primary-foreground" : "text-muted-foreground"
+                      }`}
                   >
                     {isCompleted ? (
                       <Check className="h-5 w-5" />
@@ -1129,43 +972,47 @@ const GeneratePage = () => {
                   <CardDescription>Select how you want to create your content</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <Button
-                      variant={creationMode === "brief_topic" ? "default" : "outline"}
-                      className="h-auto py-4 flex-col gap-2 relative"
-                      onClick={() => setCreationMode("brief_topic")}
-                    >
-                      <MessageSquare className="h-6 w-6" />
-                      <span className="font-medium">Brief Topic</span>
-                      <span className="text-xs opacity-70">Start with an idea</span>
-                    </Button>
-                    <Button
-                      variant={creationMode === "script" ? "default" : "outline"}
-                      className="h-auto py-4 flex-col gap-2"
-                      onClick={() => setCreationMode("script")}
-                    >
-                      <FileText className="h-6 w-6" />
-                      <span className="font-medium">Script</span>
-                      <span className="text-xs opacity-70">Improve existing content</span>
-                    </Button>
-                    <Button
-                      variant={creationMode === "video" ? "default" : "outline"}
-                      className="h-auto py-4 flex-col gap-2"
-                      onClick={() => setCreationMode("video")}
-                    >
-                      <Video className="h-6 w-6" />
-                      <span className="font-medium">YouTube</span>
-                      <span className="text-xs opacity-70">Shorts intelligence</span>
-                    </Button>
-                    <Button
-                      variant={creationMode === "video_upload" ? "default" : "outline"}
-                      className="h-auto py-4 flex-col gap-2"
-                      onClick={() => setCreationMode("video_upload")}
-                    >
-                      <Upload className="h-6 w-6" />
-                      <span className="font-medium">Upload Video</span>
-                      <span className="text-xs opacity-70">Transcribe & generate</span>
-                    </Button>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {[
+                      { id: "brief_topic", icon: MessageSquare, label: "Brief Topic", desc: "Start with a simple idea" },
+                      { id: "script", icon: FileText, label: "Script", desc: "Improve existing content" },
+                      { id: "video_upload", icon: Upload, label: "Upload Video", desc: "Transcribe & generate" },
+                    ].map((item) => {
+                      const isSelected = creationMode === item.id;
+                      return (
+                        <div key={item.id} className="relative h-full">
+                          {isSelected && (
+                            <motion.div
+                              layoutId="creation-mode-active"
+                              className="absolute inset-0 rounded-md bg-primary shadow-md z-0"
+                              transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
+                            />
+                          )}
+                          <Button
+                            variant="ghost"
+                            className={`relative z-10 h-full w-full py-4 flex-col gap-2 rounded-md transition-all duration-200 ${isSelected
+                              ? "text-primary-foreground hover:text-primary-foreground hover:bg-transparent"
+                              : "bg-card border border-input shadow-sm hover:border-primary/50 text-foreground"
+                              }`}
+                            onClick={() => setCreationMode(item.id as CreationMode)}
+                          >
+                            <div className={`p-2 rounded-full mb-0.5 transition-colors duration-200 ${isSelected
+                              ? "bg-primary-foreground/20 text-primary-foreground"
+                              : "bg-primary/10 text-primary"
+                              }`}>
+                              <item.icon className="h-5 w-5" />
+                            </div>
+                            <div className="space-y-0.5">
+                              <span className="font-semibold text-base block">{item.label}</span>
+                              <span className={`text-xs font-normal block transition-colors duration-200 ${isSelected ? "text-primary-foreground/90" : "text-muted-foreground"
+                                }`}>
+                                {item.desc}
+                              </span>
+                            </div>
+                          </Button>
+                        </div>
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>
@@ -1176,7 +1023,6 @@ const GeneratePage = () => {
                   <CardTitle className="text-lg">
                     {creationMode === "brief_topic" && "What's Your Topic?"}
                     {creationMode === "script" && "Paste Your Script"}
-                    {creationMode === "video" && "Add Your Video"}
                     {creationMode === "video_upload" && "Upload Your Video"}
                   </CardTitle>
                 </CardHeader>
@@ -1192,7 +1038,7 @@ const GeneratePage = () => {
                           onChange={(e) => setTopic(e.target.value)}
                         />
                       </div>
-                      
+
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div className="space-y-2">
                           <Label>Target Audience</Label>
@@ -1207,7 +1053,7 @@ const GeneratePage = () => {
                             </SelectContent>
                           </Select>
                         </div>
-                        
+
                         <div className="space-y-2">
                           <Label>Intent</Label>
                           <Select value={intent} onValueChange={setIntent}>
@@ -1221,7 +1067,7 @@ const GeneratePage = () => {
                             </SelectContent>
                           </Select>
                         </div>
-                        
+
                         <div className="space-y-2">
                           <Label>Tone</Label>
                           <Select value={tone} onValueChange={setTone}>
@@ -1255,135 +1101,7 @@ const GeneratePage = () => {
                     </div>
                   )}
 
-                  {creationMode === "video" && (
-                    <div className="space-y-4">
-                      {/* YouTube Shorts Only Notice */}
-                      <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
-                        <div className="flex items-start gap-2">
-                          <Sparkles className="h-5 w-5 text-primary mt-0.5" />
-                          <div>
-                            <p className="font-medium text-sm text-foreground">YouTube Shorts Intelligence Mode</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              Paste a YouTube Shorts URL to extract transcript, analyze creator intent, and generate platform-native content.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
 
-                      {/* URL Input (YouTube Shorts only for now) */}
-                      <div className="space-y-2">
-                        <Label htmlFor="videoUrl">YouTube Shorts URL</Label>
-                        <Input
-                          id="videoUrl"
-                          type="url"
-                          placeholder="https://youtube.com/shorts/..."
-                          value={videoUrl}
-                          onChange={(e) => setVideoUrl(e.target.value)}
-                          disabled={isProcessing}
-                        />
-                        {videoUrl && isValidVideoUrl(videoUrl) && detectVideoPlatform(videoUrl) === "youtube" && (
-                          <div className="flex items-center gap-2 text-sm text-green-600">
-                            <Check className="h-4 w-4" />
-                            <span>Valid YouTube Shorts URL detected</span>
-                          </div>
-                        )}
-                        {videoUrl && isValidVideoUrl(videoUrl) && detectVideoPlatform(videoUrl) !== "youtube" && (
-                          <div className="flex items-center gap-2 text-sm text-amber-600">
-                            <AlertCircle className="h-4 w-4" />
-                            <span>{getPlatformDisplayName(detectVideoPlatform(videoUrl))} detected - only YouTube Shorts supported currently</span>
-                          </div>
-                        )}
-                        {videoUrl && !isValidVideoUrl(videoUrl) && (
-                          <p className="text-sm text-destructive">
-                            Invalid URL. Please paste a valid YouTube Shorts link.
-                          </p>
-                        )}
-                        <p className="text-xs text-muted-foreground">
-                          Supported: YouTube Shorts (youtube.com/shorts/... or youtu.be/...)
-                        </p>
-                      </div>
-
-                      {/* Processing Status */}
-                      {isProcessing && videoProcessingStep !== "idle" && (
-                        <div className="rounded-lg border bg-muted/50 p-4 space-y-3">
-                          <div className="flex items-center gap-3">
-                            <motion.div
-                              animate={{ rotate: 360 }}
-                              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                            >
-                              <Sparkles className="h-5 w-5 text-primary" />
-                            </motion.div>
-                            <div className="flex-1">
-                              <p className="font-medium text-sm">
-                                {videoProcessingStep === "validating" && "Validating video URL..."}
-                                {videoProcessingStep === "fetching_metadata" && "Fetching video metadata..."}
-                                {videoProcessingStep === "transcribing" && "Transcribing audio (this may take a minute)..."}
-                                {videoProcessingStep === "analyzing" && "Analyzing creator intent..."}
-                                {videoProcessingStep === "generating" && "Generating platform content..."}
-                                {videoProcessingStep === "complete" && "Complete!"}
-                                {videoProcessingStep === "error" && "Processing failed"}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {videoProcessingStep === "transcribing" 
-                                  ? "AssemblyAI is transcribing the spoken content"
-                                  : videoProcessingStep === "generating"
-                                  ? "Creating high-quality, platform-native content"
-                                  : "Please wait..."
-                                }
-                              </p>
-                            </div>
-                          </div>
-                          <Progress 
-                            value={
-                              videoProcessingStep === "validating" ? 10 :
-                              videoProcessingStep === "fetching_metadata" ? 25 :
-                              videoProcessingStep === "transcribing" ? 50 :
-                              videoProcessingStep === "analyzing" ? 75 :
-                              videoProcessingStep === "generating" ? 90 :
-                              videoProcessingStep === "complete" ? 100 : 0
-                            } 
-                            className="h-2"
-                          />
-                        </div>
-                      )}
-
-                      {/* Video Metadata Preview (after processing) */}
-                      {videoMetadata && videoContext && (
-                        <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
-                          <div className="flex items-start gap-3">
-                            <div className="h-10 w-10 rounded-lg bg-red-100 flex items-center justify-center text-red-600">
-                              <Video className="h-5 w-5" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm truncate">{videoMetadata.title}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {videoMetadata.channel} • {videoMetadata.duration}s • {videoMetadata.views.toLocaleString()} views
-                              </p>
-                            </div>
-                          </div>
-                          {videoIntent && (
-                            <div className="flex flex-wrap gap-2 pt-2 border-t">
-                              <Badge variant="secondary" className="text-xs">
-                                Intent: {videoIntent.intent}
-                              </Badge>
-                              <Badge variant="secondary" className="text-xs">
-                                Tone: {videoIntent.tone}
-                              </Badge>
-                              <Badge variant="outline" className="text-xs">
-                                {videoMetadata.transcriptLength} chars transcribed
-                              </Badge>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Disabled file upload notice */}
-                      <div className="text-xs text-muted-foreground flex items-center gap-2 pt-2">
-                        <Lock className="h-3 w-3" />
-                        <span>File upload coming soon. Currently supporting YouTube Shorts URLs only.</span>
-                      </div>
-                    </div>
-                  )}
 
                   {creationMode === "video_upload" && (
                     <div className="space-y-4">
@@ -1403,11 +1121,10 @@ const GeneratePage = () => {
                       {/* Drag & Drop Upload Area */}
                       {!uploadFile && (
                         <div
-                          className={`relative rounded-xl border-2 border-dashed p-8 text-center transition-all cursor-pointer ${
-                            isDragging
-                              ? "border-primary bg-primary/5 scale-[1.01]"
-                              : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/30"
-                          }`}
+                          className={`relative rounded-xl border-2 border-dashed p-8 text-center transition-all cursor-pointer ${isDragging
+                            ? "border-primary bg-primary/5 scale-[1.01]"
+                            : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/30"
+                            }`}
                           onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                           onDragLeave={() => setIsDragging(false)}
                           onDrop={(e) => {
@@ -1498,10 +1215,10 @@ const GeneratePage = () => {
                           <Progress
                             value={
                               uploadProcessingStep === "uploading" ? 15 :
-                              uploadProcessingStep === "transcribing" ? 45 :
-                              uploadProcessingStep === "understanding" ? 70 :
-                              uploadProcessingStep === "generating" ? 90 :
-                              uploadProcessingStep === "complete" ? 100 : 0
+                                uploadProcessingStep === "transcribing" ? 45 :
+                                  uploadProcessingStep === "understanding" ? 70 :
+                                    uploadProcessingStep === "generating" ? 90 :
+                                      uploadProcessingStep === "complete" ? 100 : 0
                             }
                             className="h-2"
                           />
@@ -1591,14 +1308,12 @@ const GeneratePage = () => {
                             {activeStageList.map((stage, index) => (
                               <div
                                 key={stage}
-                                className={`flex items-center gap-2 text-xs ${
-                                  index === activeStageIndex ? "text-foreground" : "text-muted-foreground"
-                                }`}
+                                className={`flex items-center gap-2 text-xs ${index === activeStageIndex ? "text-foreground" : "text-muted-foreground"
+                                  }`}
                               >
                                 <span
-                                  className={`h-2 w-2 rounded-full ${
-                                    index <= activeStageIndex ? "bg-primary" : "bg-muted"
-                                  }`}
+                                  className={`h-2 w-2 rounded-full ${index <= activeStageIndex ? "bg-primary" : "bg-muted"
+                                    }`}
                                 />
                                 <span>{stage}</span>
                               </div>
@@ -1616,10 +1331,10 @@ const GeneratePage = () => {
                 <CardHeader>
                   <CardTitle className="text-lg">Output Platforms</CardTitle>
                   <CardDescription>
-                    Content will be generated for your selected platforms. 
-                    <a href="/dashboard/settings?tab=platforms" className="text-primary hover:underline ml-1">
+                    Content will be generated for your selected platforms.
+                    <Link to="/dashboard/settings?tab=platforms" className="text-primary hover:underline ml-1">
                       Change in settings
-                    </a>
+                    </Link>
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -1631,9 +1346,11 @@ const GeneratePage = () => {
                           <Badge
                             key={platformId}
                             variant="secondary"
-                            className="px-3 py-1.5 text-sm"
+                            className="px-3 py-1.5 text-sm flex items-center"
                           >
-                            <span className="mr-1.5">{platform?.icon || "📝"}</span>
+                            <span className="mr-1.5 flex items-center">
+                              {platform?.icon ? <platform.icon className="h-4 w-4" /> : "📝"}
+                            </span>
                             {platform?.label || platformId}
                           </Badge>
                         );
@@ -1711,11 +1428,10 @@ const GeneratePage = () => {
                               <p className="font-medium text-foreground">{item.label}</p>
                               <p className="text-sm text-muted-foreground">{item.description}</p>
                             </div>
-                            <span className={`text-2xl font-bold ${
-                              item.score >= 80 ? "text-green-600 dark:text-green-400" :
+                            <span className={`text-2xl font-bold ${item.score >= 80 ? "text-green-600 dark:text-green-400" :
                               item.score >= 60 ? "text-primary" :
-                              "text-amber-600 dark:text-amber-400"
-                            }`}>{item.score}%</span>
+                                "text-amber-600 dark:text-amber-400"
+                              }`}>{item.score}%</span>
                           </div>
                           <Progress value={item.score} className="h-2" />
                         </motion.div>
@@ -1791,7 +1507,7 @@ const GeneratePage = () => {
                       <p className="text-foreground">{improvement}</p>
                     </motion.div>
                   ))}
-                  
+
                   <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 mt-4">
                     <p className="text-sm text-muted-foreground">
                       <strong className="text-foreground">Good news!</strong> We've already applied these improvements to your platform-ready outputs. Continue to see the optimized versions.
@@ -1880,9 +1596,13 @@ const GeneratePage = () => {
                               <TabsTrigger
                                 key={platform.platform}
                                 value={platform.platform.toLowerCase()}
-                                className="flex-1 min-w-[80px] data-[state=active]:bg-background gap-1"
+                                className="flex-1 min-w-[80px] data-[state=active]:bg-background gap-2"
                               >
-                                <span>{platformConfig?.icon || "📝"}</span>
+                                {platformConfig?.icon ? (
+                                  <platformConfig.icon className="h-4 w-4" />
+                                ) : (
+                                  <span>📝</span>
+                                )}
                                 <span className="hidden sm:inline">{platformConfig?.label || platform.platform}</span>
                               </TabsTrigger>
                             );
@@ -1985,11 +1705,10 @@ const GeneratePage = () => {
                                     <p className="font-medium text-foreground">{item.label}</p>
                                     <p className="text-sm text-muted-foreground">{item.description}</p>
                                   </div>
-                                  <span className={`text-2xl font-bold ${
-                                    item.score >= 80 ? "text-green-600 dark:text-green-400" :
+                                  <span className={`text-2xl font-bold ${item.score >= 80 ? "text-green-600 dark:text-green-400" :
                                     item.score >= 60 ? "text-primary" :
-                                    "text-amber-600 dark:text-amber-400"
-                                  }`}>{item.score}%</span>
+                                      "text-amber-600 dark:text-amber-400"
+                                    }`}>{item.score}%</span>
                                 </div>
                                 <Progress value={item.score} className="h-2" />
                               </motion.div>
@@ -2046,21 +1765,7 @@ const GeneratePage = () => {
                 </CardContent>
               </Card>
 
-              {creationMode === "video" && testingMode && (
-                <Card className="mt-4 border-dashed">
-                  <CardContent className="pt-6">
-                    <div className="flex items-start gap-3">
-                      <AlertCircle className="h-5 w-5 text-primary mt-0.5" />
-                      <div className="space-y-1">
-                        <p className="font-medium text-foreground">Demo Mode Active</p>
-                        <p className="text-sm text-muted-foreground">
-                          This output was generated from sample data for demonstration. Video analysis and transcription will be processed when you submit a real video URL or file.
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+
 
               <div className="flex flex-col sm:flex-row sm:justify-between gap-3 mt-6">
                 <Button variant="outline" onClick={() => setCurrentStep(1)}>
@@ -2097,17 +1802,17 @@ const GeneratePage = () => {
             </motion.div>
           )}
         </AnimatePresence>
-      </motion.div>
+      </motion.div >
 
       {/* Insufficient Credits Modal */}
-      <InsufficientCreditsModal
+      < InsufficientCreditsModal
         open={showCreditsModal}
         onOpenChange={setShowCreditsModal}
         creditsUsed={creditsUsed}
         creditsLimit={creditsLimit}
         currentPlan={plan}
       />
-    </div>
+    </div >
   );
 };
 
