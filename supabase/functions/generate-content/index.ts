@@ -96,7 +96,7 @@ const getSafeErrorMessage = (error: unknown): string => {
 
 // Input validation schema
 const generateContentSchema = z.object({
-  mode: z.enum(["brief_topic", "script", "video"]),
+  mode: z.enum(["brief_topic", "script", "video", "video_upload"]),
   topic: z.string().max(500, "Topic too long").optional(),
   audience: z.string().max(200, "Audience description too long").optional(),
   intent: z.string().max(200, "Intent too long").optional(),
@@ -105,7 +105,7 @@ const generateContentSchema = z.object({
   platforms: z.array(
     z.string().max(50)
   ).min(1, "At least one platform must be selected").max(6, "Maximum 6 platforms allowed"),
-  // Video mode enriched context
+  // YouTube Shorts video mode enriched context
   video_context: z.object({
     source_platform: z.literal("youtube_shorts"),
     video_id: z.string(),
@@ -125,6 +125,21 @@ const generateContentSchema = z.object({
     core_message: z.string(),
     key_takeaways: z.array(z.string()),
   }).optional(),
+  // Video upload mode context
+  upload_context: z.object({
+    source_type: z.literal("uploaded_video"),
+    transcript: z.string().min(120, "Transcript too short"),
+    duration_seconds: z.number(),
+    word_count: z.number(),
+  }).optional(),
+  upload_intent: z.object({
+    intent: z.enum(["educate", "explain", "inspire", "sell", "entertain"]),
+    target_audience: z.string(),
+    tone: z.enum(["educational", "casual", "bold", "story-driven"]),
+    core_message: z.string(),
+    key_takeaways: z.array(z.string()),
+    inference_confidence: z.number().optional(),
+  }).optional(),
 }).refine(
   (data) => {
     if (data.mode === "brief_topic") {
@@ -136,9 +151,12 @@ const generateContentSchema = z.object({
     if (data.mode === "video") {
       return !!data.video_context && !!data.video_intent && data.video_context.transcript.length > 0;
     }
+    if (data.mode === "video_upload") {
+      return !!data.upload_context && !!data.upload_intent && data.upload_context.transcript.length >= 120;
+    }
     return false;
   },
-  { message: "Topic required for brief_topic, script_text for script, or video_context + video_intent for video mode" }
+  { message: "Required fields missing for the selected mode" }
 );
 
 // Platform-specific formatting instructions
@@ -208,7 +226,7 @@ serve(async (req) => {
       );
     }
     
-    const { mode, topic, audience, intent, tone, script_text, platforms, video_context, video_intent } = validation.data;
+    const { mode, topic, audience, intent, tone, script_text, platforms, video_context, video_intent, upload_context, upload_intent } = validation.data;
     logStep("Request validated", { mode, platformCount: platforms.length });
 
     // Get user plan and usage
@@ -378,6 +396,41 @@ Core Message: ${video_intent.core_message}
 
 Key Takeaways:
 ${video_intent.key_takeaways.map((t: string, i: number) => `${i + 1}. ${t}`).join("\n")}
+
+=== YOUR MISSION ===
+1. Preserve the original creator's THINKING, not just their words
+2. Improve clarity, structure, and impact WITHOUT changing the core meaning
+3. Optimize for insight density, not length - every sentence must earn its place
+4. Make the output feel like it was written by a thoughtful human creator
+5. Do NOT paraphrase blindly or generate fluffy content
+6. Do NOT explain obvious things or sound like an AI assistant
+
+${contentQualityByPlan[planTier]}
+
+Analyze the content for clarity, hook strength, engagement potential, and structure.
+Then create platform-specific versions that are sharper and more valuable than generic rewrites.
+`;
+    } else if (mode === "video_upload" && upload_context && upload_intent) {
+      contentPrompt = `
+You are a senior content strategist who transforms spoken video content into platform-native posts.
+You think deeply before writing. You never generate generic content.
+
+=== UPLOADED VIDEO CONTEXT ===
+Source: Uploaded video file
+Duration: ${upload_context.duration_seconds} seconds
+Word Count: ${upload_context.word_count} words
+
+=== FULL TRANSCRIPT ===
+${upload_context.transcript}
+
+=== INFERRED CREATOR INTENT ===
+Primary Intent: ${upload_intent.intent}
+Target Audience: ${upload_intent.target_audience}
+Tone: ${upload_intent.tone}
+Core Message: ${upload_intent.core_message}
+
+Key Takeaways:
+${upload_intent.key_takeaways.map((t: string, i: number) => `${i + 1}. ${t}`).join("\n")}
 
 === YOUR MISSION ===
 1. Preserve the original creator's THINKING, not just their words
