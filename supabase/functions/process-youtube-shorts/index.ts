@@ -124,6 +124,7 @@ function extractHashtags(text: string): string[] {
 serve(async (req) => {
   const origin = req.headers.get("origin");
   const corsHeaders = getCorsHeaders(origin);
+  const bypassAuth = Deno.env.get("BYPASS_AUTH") === "true";
 
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -138,16 +139,20 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
-    // Auth check
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) throw new Error("No authorization header provided");
+    if (!bypassAuth) {
+      // Auth check
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader) throw new Error("No authorization header provided");
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
-    if (userError) throw new Error(`Authentication error: ${userError.message}`);
-    const user = userData.user;
-    if (!user?.id) throw new Error("User not authenticated");
-    logStep("User authenticated", { userId: user.id });
+      const token = authHeader.replace("Bearer ", "");
+      const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
+      if (userError) throw new Error(`Authentication error: ${userError.message}`);
+      const user = userData.user;
+      if (!user?.id) throw new Error("User not authenticated");
+      logStep("User authenticated", { userId: user.id });
+    } else {
+      logStep("Auth bypassed for local testing");
+    }
 
     // Validate request
     const body = await req.json();

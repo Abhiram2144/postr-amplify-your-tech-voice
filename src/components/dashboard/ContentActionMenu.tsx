@@ -12,7 +12,7 @@ import { motion } from "framer-motion";
 
 interface ContentActionMenuProps {
   onView: () => void;
-  onCopy: () => void;
+  onCopy?: () => void;
   onDelete?: () => void;
   isCopied?: boolean;
 }
@@ -55,26 +55,28 @@ export const ContentActionMenu = ({
           <span>View Details</span>
         </DropdownMenuItem>
 
-        <DropdownMenuItem
-          onClick={(e) => {
-            e.stopPropagation();
-            onCopy();
-            setIsOpen(false);
-          }}
-          className="cursor-pointer"
-        >
-          {isCopied ? (
-            <>
-              <Check className="mr-2 h-4 w-4 text-primary" />
-              <span>Copied!</span>
-            </>
-          ) : (
-            <>
-              <Copy className="mr-2 h-4 w-4 text-primary" />
-              <span>Copy Content</span>
-            </>
-          )}
-        </DropdownMenuItem>
+        {onCopy && (
+          <DropdownMenuItem
+            onClick={(e) => {
+              e.stopPropagation();
+              onCopy();
+              setIsOpen(false);
+            }}
+            className="cursor-pointer"
+          >
+            {isCopied ? (
+              <>
+                <Check className="mr-2 h-4 w-4 text-primary" />
+                <span>Copied!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="mr-2 h-4 w-4 text-primary" />
+                <span>Copy Content</span>
+              </>
+            )}
+          </DropdownMenuItem>
+        )}
 
         {onDelete && (
           <>

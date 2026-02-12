@@ -223,23 +223,6 @@ const FeaturesSection = () => {
           </div>
         </div>
 
-        {/* Scroll Progress Indicator */}
-        <div className="absolute bottom-8 left-1/2 flex -translate-x-1/2 gap-1.5">
-          {useCases.map((_, index) => (
-            <motion.div
-              key={index}
-              animate={{
-                width: index === activeIndex ? 24 : 8,
-                backgroundColor:
-                  index === activeIndex
-                    ? "hsl(var(--primary))"
-                    : "hsl(var(--muted-foreground) / 0.25)",
-              }}
-              transition={{ duration: 0.3 }}
-              className="h-2 rounded-full"
-            />
-          ))}
-        </div>
       </div>
     </section>
   );

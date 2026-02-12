@@ -1,7 +1,6 @@
-import { motion, useInView, AnimatePresence } from "framer-motion";
+import { motion, useInView, AnimatePresence, useScroll, useTransform, useMotionValueEvent } from "framer-motion";
 import { useRef, useState } from "react";
-import { Upload, Search, Sparkles, Send, Check, ChevronLeft, ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Upload, Search, Sparkles, Send, Check } from "lucide-react";
 const steps = [{
   icon: Upload,
   title: "Start with your idea",
@@ -37,15 +36,25 @@ const steps = [{
   }
 }];
 const HowItWorksSection = () => {
-  const ref = useRef(null);
+  const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, {
     once: true,
     margin: "-100px"
   });
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ["start start", "end end"]
+  });
+  const cardsParallaxY = useTransform(scrollYProgress, [0, 1], [24, -24]);
   const [activeStep, setActiveStep] = useState(0);
   const handleStepClick = (index: number) => {
     setActiveStep(index);
   };
+
+  useMotionValueEvent(scrollYProgress, "change", latest => {
+    const index = Math.min(Math.floor(latest * steps.length), steps.length - 1);
+    setActiveStep(index);
+  });
 
   // Preview components for each step type
   const renderPreview = (step: typeof steps[0]) => {
@@ -147,39 +156,43 @@ const HowItWorksSection = () => {
         return null;
     }
   };
-  return <section id="how-it-works" ref={ref} className="relative border-t border-border py-24 sm:py-32">
-      <div className="container relative mx-auto px-4">
-        {/* Header */}
-        <motion.div initial={{
-        opacity: 0,
-        y: 20
-      }} animate={isInView ? {
-        opacity: 1,
-        y: 0
-      } : {}} transition={{
-        duration: 0.5,
-        ease: "easeOut"
-      }} className="text-center">
-          
-          <h2 className="mt-6 text-3xl font-bold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
-            From idea to posts in{" "}
-            <span className="gradient-text">four steps</span>
-          </h2>
-        </motion.div>
+  return <section id="how-it-works" ref={ref} className="relative border-t border-border" style={{
+    height: `${(steps.length + 1) * 100}vh`
+  }}>
+      <div className="sticky top-0 h-screen overflow-hidden">
+        <div className="container relative mx-auto flex h-full items-center px-4">
+          <div className="w-full py-24 sm:py-32">
+            {/* Header */}
+            <motion.div initial={{
+            opacity: 0,
+            y: 20
+          }} animate={isInView ? {
+            opacity: 1,
+            y: 0
+          } : {}} transition={{
+            duration: 0.5,
+            ease: "easeOut"
+          }} className="text-center">
+              
+              <h2 className="mt-6 text-3xl font-bold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
+                From idea to posts in{" "}
+                <span className="gradient-text">four steps</span>
+              </h2>
+            </motion.div>
 
-        <div className="mx-auto mt-16 max-w-4xl">
-          {/* Stepper Timeline */}
-          <motion.div initial={{
-          opacity: 0,
-          y: 20
-        }} animate={isInView ? {
-          opacity: 1,
-          y: 0
-        } : {}} transition={{
-          duration: 0.5,
-          delay: 0.1,
-          ease: "easeOut"
-        }} className="relative mb-12">
+            <div className="mx-auto mt-16 max-w-4xl">
+              {/* Stepper Timeline */}
+              <motion.div initial={{
+              opacity: 0,
+              y: 20
+            }} animate={isInView ? {
+              opacity: 1,
+              y: 0
+            } : {}} transition={{
+              duration: 0.5,
+              delay: 0.1,
+              ease: "easeOut"
+            }} className="relative mb-12">
             {/* Step indicators */}
             <div className="relative flex justify-between">
               {/* Progress track - positioned at icon center (h-14 = 56px, center = 28px) */}
@@ -225,20 +238,20 @@ const HowItWorksSection = () => {
           </motion.div>
 
           {/* Content Card with horizontal slide */}
-          <AnimatePresence mode="wait">
-            <motion.div key={activeStep} initial={{
-            x: 40,
-            opacity: 0
-          }} animate={{
-            x: 0,
-            opacity: 1
-          }} exit={{
-            x: -40,
-            opacity: 0
-          }} transition={{
-            duration: 0.35,
-            ease: "easeOut"
-          }} className="rounded-2xl border border-border bg-card p-8 shadow-sm">
+              <AnimatePresence mode="wait">
+                <motion.div key={activeStep} initial={{
+                x: 40,
+                opacity: 0
+              }} animate={{
+                x: 0,
+                opacity: 1
+              }} exit={{
+                x: -40,
+                opacity: 0
+              }} transition={{
+                duration: 0.35,
+                ease: "easeOut"
+              }} style={{ y: cardsParallaxY }} className="rounded-2xl border border-border bg-card p-8 shadow-sm">
               <div className="flex flex-col gap-6 md:flex-row md:items-start">
                 {/* Icon + Title group */}
                 <div className="flex items-start gap-4 md:w-1/3">
@@ -276,28 +289,10 @@ const HowItWorksSection = () => {
                 </div>
               </div>
 
-              {/* Step navigation dots */}
-              <div className="mt-6 flex justify-center gap-2">
-                {steps.map((_, index) => <button key={index} onClick={() => handleStepClick(index)} className={`h-2 rounded-full transition-all duration-300 ${index === activeStep ? "w-8 bg-primary" : index < activeStep ? "w-2 bg-primary/50" : "w-2 bg-muted hover:bg-muted-foreground/30"}`} />)}
-              </div>
-            </motion.div>
-          </AnimatePresence>
+                </motion.div>
+              </AnimatePresence>
 
-          {/* Navigation Buttons */}
-          <div className="mt-6 flex items-center justify-between">
-            <Button variant="outline" onClick={() => setActiveStep(prev => Math.max(0, prev - 1))} disabled={activeStep === 0} className="gap-2">
-              <ChevronLeft className="h-4 w-4" />
-              Previous
-            </Button>
-            
-            <span className="text-sm text-muted-foreground">
-              {activeStep + 1} of {steps.length}
-            </span>
-            
-            <Button onClick={() => setActiveStep(prev => Math.min(steps.length - 1, prev + 1))} disabled={activeStep === steps.length - 1} className="gap-2">
-              Next
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+            </div>
           </div>
         </div>
       </div>
