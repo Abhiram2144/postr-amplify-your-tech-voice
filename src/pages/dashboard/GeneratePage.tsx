@@ -26,6 +26,8 @@ import {
   Lock,
   AlertCircle,
   Plus,
+  Upload,
+  X,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -42,7 +44,7 @@ interface DashboardContext {
 }
 
 type Step = 1 | 2 | 3 | 4;
-type CreationMode = "brief_topic" | "script" | "video";
+type CreationMode = "brief_topic" | "script" | "video" | "video_upload";
 
 const steps = [
   { number: 1, name: "Input", icon: FileText },
@@ -247,6 +249,36 @@ const VIDEO_GENERATION_STAGES: Record<VideoProcessingStep, string> = {
   error: "Processing failed",
 };
 
+// Upload processing steps
+type UploadProcessingStep = "idle" | "uploading" | "transcribing" | "understanding" | "generating" | "complete" | "error";
+
+const UPLOAD_GENERATION_STAGES: Record<UploadProcessingStep, string> = {
+  idle: "Preparing upload",
+  uploading: "Uploading video",
+  transcribing: "Transcribing audio",
+  understanding: "Understanding creator intent",
+  generating: "Generating platform content",
+  complete: "Finalizing results",
+  error: "Processing failed",
+};
+
+// Upload context types
+interface UploadContext {
+  source_type: "uploaded_video";
+  transcript: string;
+  duration_seconds: number;
+  word_count: number;
+}
+
+interface UploadIntent {
+  intent: "educate" | "explain" | "inspire" | "sell" | "entertain";
+  target_audience: string;
+  tone: "educational" | "casual" | "bold" | "story-driven";
+  core_message: string;
+  key_takeaways: string[];
+  inference_confidence: number;
+}
+
 const GeneratePage = () => {
   const { profile } = useOutletContext<DashboardContext>();
   const { user, session } = useAuth();
@@ -292,6 +324,14 @@ const GeneratePage = () => {
   const [videoIntent, setVideoIntent] = useState<VideoIntent | null>(null);
   const [videoMetadata, setVideoMetadata] = useState<VideoProcessingResult["metadata"] | null>(null);
   
+  // Video Upload Mode Inputs
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadProcessingStep, setUploadProcessingStep] = useState<UploadProcessingStep>("idle");
+  const [uploadContext, setUploadContext] = useState<UploadContext | null>(null);
+  const [uploadIntent, setUploadIntent] = useState<UploadIntent | null>(null);
+  const [uploadMetadata, setUploadMetadata] = useState<{ fileName: string; duration: number; wordCount: number; transcriptLength: number; transcriptConfidence: number } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
   // Platforms come from user profile (set during onboarding or in settings) - not selectable here
   const userPlatforms = profile?.platforms || ["linkedin", "twitter"];
   
@@ -341,7 +381,7 @@ const GeneratePage = () => {
   }, [user?.id]);
 
   useEffect(() => {
-    if (!isProcessing || currentStep !== 1 || creationMode === "video") return;
+    if (!isProcessing || currentStep !== 1 || creationMode === "video" || creationMode === "video_upload") return;
     setTextStageIndex(0);
     const intervalId = window.setInterval(() => {
       setTextStageIndex((prev) => (prev + 1) % TEXT_GENERATION_STAGES.length);
@@ -418,9 +458,12 @@ const GeneratePage = () => {
         }
         return videoFile !== null;
       }
+      if (creationMode === "video_upload") {
+        return uploadFile !== null;
+      }
     }
     return true;
-  }, [currentStep, creationMode, topic, scriptText, userPlatforms.length, videoInputMethod, videoUrl, videoFile]);
+  }, [currentStep, creationMode, topic, scriptText, userPlatforms.length, videoInputMethod, videoUrl, videoFile, uploadFile]);
 
   const persistOutputs = async (projectId: string | null, payload: { analysis: AnalysisResult; outputs: PlatformOutput[] }, source: 'ai' | 'mock' | 'video_transcript' = 'ai') => {
     if (!projectId) return;
@@ -461,7 +504,7 @@ const GeneratePage = () => {
 
   const handleGenerate = async (append = false) => {
     // Check credits for text generation (skip if testing mode enabled)
-    if (!testingMode && creationMode !== "video" && creditsRemaining <= 0) {
+    if (!testingMode && creationMode !== "video" && creationMode !== "video_upload" && creditsRemaining <= 0) {
       setShowCreditsModal(true);
       return;
     }
@@ -489,6 +532,12 @@ const GeneratePage = () => {
     // Real video mode - YouTube Shorts Intelligence
     if (creationMode === "video" && !testingMode) {
       await handleVideoGeneration(append);
+      return;
+    }
+
+    // Real video upload mode
+    if (creationMode === "video_upload" && !testingMode) {
+      await handleVideoUploadGeneration(append);
       return;
     }
 
@@ -665,6 +714,164 @@ const GeneratePage = () => {
     }
   };
 
+  // Video Upload Intelligence Mode handler
+  const handleVideoUploadGeneration = async (append = false) => {
+    if (!uploadFile) {
+      toast({ title: "No file selected", description: "Please upload a video file", variant: "destructive" });
+      return;
+    }
+
+    // Validate file
+    const validation = isValidVideoFile(uploadFile);
+    if (!validation.valid) {
+      toast({ title: "Invalid file", description: validation.error, variant: "destructive" });
+      return;
+    }
+
+    // Additional size check (50MB for upload mode)
+    if (uploadFile.size > 50 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Maximum file size is 50MB", variant: "destructive" });
+      return;
+    }
+
+    setIsProcessing(true);
+    setUploadProcessingStep("uploading");
+
+    try {
+      if (!user?.id || !session?.access_token) throw new Error("Not authenticated");
+
+      // Step 1: Upload to Supabase Storage
+      const videoUuid = crypto.randomUUID();
+      const ext = uploadFile.name.split(".").pop() || "mp4";
+      const storagePath = `${user.id}/${videoUuid}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("videos")
+        .upload(storagePath, uploadFile, {
+          contentType: uploadFile.type,
+          upsert: false,
+        });
+
+      if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
+
+      setUploadProcessingStep("transcribing");
+
+      // Step 2: Call process-video edge function
+      const { data: videoData, error: videoError } = await supabase.functions.invoke("process-video", {
+        body: {
+          storagePath,
+          fileName: uploadFile.name,
+          fileSizeBytes: uploadFile.size,
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (videoError) throw videoError;
+      if (videoData.error) {
+        if (videoData.error === "insufficient_spoken_content") {
+          toast({
+            title: "Insufficient Spoken Content",
+            description: videoData.message || "The video doesn't contain enough speech to analyze.",
+            variant: "destructive",
+          });
+          setUploadProcessingStep("error");
+          return;
+        }
+        throw new Error(videoData.error);
+      }
+
+      setUploadProcessingStep("understanding");
+
+      // Store context and intent
+      const processedContext = videoData.context as UploadContext;
+      const processedIntent = videoData.intent as UploadIntent;
+      const processedMetadata = videoData.metadata;
+
+      setUploadContext(processedContext);
+      setUploadIntent(processedIntent);
+      setUploadMetadata(processedMetadata);
+
+      setUploadProcessingStep("generating");
+
+      // Step 3: Generate content using enriched context
+      const { data: genData, error: genError } = await supabase.functions.invoke("generate-content", {
+        body: {
+          mode: "video_upload",
+          platforms: userPlatforms,
+          upload_context: processedContext,
+          upload_intent: processedIntent,
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (genError) throw genError;
+      if (genData.error === "insufficient_credits") {
+        setShowCreditsModal(true);
+        throw new Error("insufficient_credits");
+      }
+      if (genData.error) throw new Error(genData.error);
+
+      setUploadProcessingStep("complete");
+
+      addOutputVariant({
+        analysis: genData.analysis as AnalysisResult,
+        outputs: genData.outputs as PlatformOutput[],
+      }, append);
+
+      if (genData.credits?.used !== undefined) {
+        updateCreditsAfterGeneration(genData.credits.used);
+      }
+
+      if (append) {
+        setHasGeneratedAnother(true);
+      }
+      setOutputDetailTab("content");
+      setCurrentStep(4);
+
+      toast({
+        title: append ? "Another version generated" : "Video Analyzed & Content Generated!",
+        description: append
+          ? "Select your preferred version per platform, then save."
+          : `Transcribed ${processedMetadata.wordCount} words (${Math.round(processedMetadata.duration)}s). ${genData.credits?.remaining ?? creditsRemaining - 1} credits remaining.`,
+      });
+
+    } catch (error) {
+      console.error("Video upload generation error:", error);
+      setUploadProcessingStep("error");
+
+      if (error instanceof Error && error.message === "insufficient_credits") return;
+
+      toast({
+        title: "Video Processing Failed",
+        description: error instanceof Error ? error.message : "Could not process the video. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+      setTimeout(() => setUploadProcessingStep("idle"), 3000);
+    }
+  };
+
+  // File upload validation helper
+  const handleFileSelect = (file: File | null) => {
+    if (!file) return;
+    const validation = isValidVideoFile(file);
+    if (!validation.valid) {
+      toast({ title: "Invalid file", description: validation.error, variant: "destructive" });
+      return;
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Maximum file size is 50MB", variant: "destructive" });
+      return;
+    }
+    setUploadFile(file);
+  };
+
+
   const handleSaveSelectedToProject = async () => {
     if (Object.keys(selectedVariantByPlatform).length === 0) {
       toast({
@@ -731,6 +938,13 @@ const GeneratePage = () => {
     setSelectedVariantByPlatform({});
     setHasGeneratedAnother(false);
     setVariantsSaved(false);
+    // Reset upload state
+    setUploadFile(null);
+    setUploadProcessingStep("idle");
+    setUploadContext(null);
+    setUploadIntent(null);
+    setUploadMetadata(null);
+    setIsDragging(false);
   };
 
 
@@ -785,16 +999,26 @@ const GeneratePage = () => {
 
   const platformTabs = getAllPlatforms();
   const videoStageOrder: VideoProcessingStep[] = ["validating", "fetching_metadata", "transcribing", "analyzing", "generating", "complete"];
+  const uploadStageOrder: UploadProcessingStep[] = ["uploading", "transcribing", "understanding", "generating", "complete"];
   const currentVideoStageIndex = Math.max(0, videoStageOrder.indexOf(videoProcessingStep));
+  const currentUploadStageIndex = Math.max(0, uploadStageOrder.indexOf(uploadProcessingStep));
   const activeStageList = creationMode === "video"
     ? videoStageOrder.map((stage) => VIDEO_GENERATION_STAGES[stage])
+    : creationMode === "video_upload"
+    ? uploadStageOrder.map((stage) => UPLOAD_GENERATION_STAGES[stage])
     : TEXT_GENERATION_STAGES;
-  const activeStageIndex = creationMode === "video" ? currentVideoStageIndex : textStageIndex;
+  const activeStageIndex = creationMode === "video" ? currentVideoStageIndex
+    : creationMode === "video_upload" ? currentUploadStageIndex
+    : textStageIndex;
   const activeStageLabel = creationMode === "video"
     ? VIDEO_GENERATION_STAGES[videoProcessingStep]
+    : creationMode === "video_upload"
+    ? UPLOAD_GENERATION_STAGES[uploadProcessingStep]
     : TEXT_GENERATION_STAGES[textStageIndex];
   const activeStageProgress = creationMode === "video"
     ? ((currentVideoStageIndex + 1) / videoStageOrder.length) * 100
+    : creationMode === "video_upload"
+    ? ((currentUploadStageIndex + 1) / uploadStageOrder.length) * 100
     : ((textStageIndex + 1) / TEXT_GENERATION_STAGES.length) * 100;
 
   return (
@@ -896,7 +1120,7 @@ const GeneratePage = () => {
                   <CardDescription>Select how you want to create your content</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <Button
                       variant={creationMode === "brief_topic" ? "default" : "outline"}
                       className="h-auto py-4 flex-col gap-2 relative"
@@ -921,8 +1145,17 @@ const GeneratePage = () => {
                       onClick={() => setCreationMode("video")}
                     >
                       <Video className="h-6 w-6" />
-                      <span className="font-medium">Video</span>
-                      <span className="text-xs opacity-70">Analyze & generate</span>
+                      <span className="font-medium">YouTube</span>
+                      <span className="text-xs opacity-70">Shorts intelligence</span>
+                    </Button>
+                    <Button
+                      variant={creationMode === "video_upload" ? "default" : "outline"}
+                      className="h-auto py-4 flex-col gap-2"
+                      onClick={() => setCreationMode("video_upload")}
+                    >
+                      <Upload className="h-6 w-6" />
+                      <span className="font-medium">Upload Video</span>
+                      <span className="text-xs opacity-70">Transcribe & generate</span>
                     </Button>
                   </div>
                 </CardContent>
@@ -935,6 +1168,7 @@ const GeneratePage = () => {
                     {creationMode === "brief_topic" && "What's Your Topic?"}
                     {creationMode === "script" && "Paste Your Script"}
                     {creationMode === "video" && "Add Your Video"}
+                    {creationMode === "video_upload" && "Upload Your Video"}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4 relative">
@@ -1142,6 +1376,166 @@ const GeneratePage = () => {
                     </div>
                   )}
 
+                  {creationMode === "video_upload" && (
+                    <div className="space-y-4">
+                      {/* Upload Mode Notice */}
+                      <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+                        <div className="flex items-start gap-2">
+                          <Upload className="h-5 w-5 text-primary mt-0.5" />
+                          <div>
+                            <p className="font-medium text-sm text-foreground">Video Upload Intelligence</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Upload a short video file. We'll transcribe the audio, understand your intent, and generate platform-native content.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Drag & Drop Upload Area */}
+                      {!uploadFile && (
+                        <div
+                          className={`relative rounded-xl border-2 border-dashed p-8 text-center transition-all cursor-pointer ${
+                            isDragging
+                              ? "border-primary bg-primary/5 scale-[1.01]"
+                              : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/30"
+                          }`}
+                          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                          onDragLeave={() => setIsDragging(false)}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            setIsDragging(false);
+                            const file = e.dataTransfer.files[0];
+                            if (file) handleFileSelect(file);
+                          }}
+                          onClick={() => {
+                            const input = document.createElement("input");
+                            input.type = "file";
+                            input.accept = "video/mp4,video/quicktime,video/webm";
+                            input.onchange = (e) => {
+                              const file = (e.target as HTMLInputElement).files?.[0];
+                              if (file) handleFileSelect(file);
+                            };
+                            input.click();
+                          }}
+                        >
+                          <motion.div
+                            animate={isDragging ? { scale: 1.05, y: -4 } : { scale: 1, y: 0 }}
+                            className="flex flex-col items-center gap-3"
+                          >
+                            <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center">
+                              <Upload className="h-7 w-7 text-primary" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-foreground">
+                                {isDragging ? "Drop your video here" : "Drag & drop or click to upload"}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                MP4, MOV, or WebM • Max 50MB • Under 2 minutes
+                              </p>
+                            </div>
+                          </motion.div>
+                        </div>
+                      )}
+
+                      {/* Selected File Preview */}
+                      {uploadFile && !isProcessing && (
+                        <div className="rounded-lg border bg-muted/30 p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                              <Video className="h-5 w-5 text-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate">{uploadFile.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {(uploadFile.size / (1024 * 1024)).toFixed(1)} MB • {uploadFile.type.split("/")[1]?.toUpperCase()}
+                              </p>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setUploadFile(null)}
+                              className="h-8 w-8 p-0"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Processing Status */}
+                      {isProcessing && uploadProcessingStep !== "idle" && (
+                        <div className="rounded-lg border bg-muted/50 p-4 space-y-3">
+                          <div className="flex items-center gap-3">
+                            <motion.div
+                              animate={{ rotate: 360 }}
+                              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                            >
+                              <Sparkles className="h-5 w-5 text-primary" />
+                            </motion.div>
+                            <div className="flex-1">
+                              <p className="font-medium text-sm">
+                                {UPLOAD_GENERATION_STAGES[uploadProcessingStep]}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {uploadProcessingStep === "uploading" && "Securely uploading your video..."}
+                                {uploadProcessingStep === "transcribing" && "Transcribing audio (this may take a minute)..."}
+                                {uploadProcessingStep === "understanding" && "Analyzing creator intent and tone..."}
+                                {uploadProcessingStep === "generating" && "Creating platform-native content..."}
+                                {uploadProcessingStep === "complete" && "Done!"}
+                                {uploadProcessingStep === "error" && "Something went wrong"}
+                              </p>
+                            </div>
+                          </div>
+                          <Progress
+                            value={
+                              uploadProcessingStep === "uploading" ? 15 :
+                              uploadProcessingStep === "transcribing" ? 45 :
+                              uploadProcessingStep === "understanding" ? 70 :
+                              uploadProcessingStep === "generating" ? 90 :
+                              uploadProcessingStep === "complete" ? 100 : 0
+                            }
+                            className="h-2"
+                          />
+                        </div>
+                      )}
+
+                      {/* Upload Result Preview */}
+                      {uploadMetadata && uploadIntent && !isProcessing && (
+                        <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+                          <div className="flex items-start gap-3">
+                            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                              <Check className="h-5 w-5 text-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm">{uploadMetadata.fileName}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {Math.round(uploadMetadata.duration)}s • {uploadMetadata.wordCount} words transcribed
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-2 pt-2 border-t">
+                            <Badge variant="secondary" className="text-xs">
+                              Intent: {uploadIntent.intent}
+                            </Badge>
+                            <Badge variant="secondary" className="text-xs">
+                              Tone: {uploadIntent.tone}
+                            </Badge>
+                            {uploadIntent.inference_confidence < 0.6 && (
+                              <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">
+                                Low confidence — review intent
+                              </Badge>
+                            )}
+                          </div>
+                          {uploadIntent.core_message && (
+                            <p className="text-xs text-muted-foreground italic border-t pt-2">
+                              "{uploadIntent.core_message}"
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="pt-2 border-t space-y-2">
                     <Label>Link to a project (optional)</Label>
                     <Select
@@ -1260,11 +1654,11 @@ const GeneratePage = () => {
                       >
                         <Sparkles className="h-5 w-5" />
                       </motion.div>
-                      {creationMode === "script" ? "Analyzing..." : "Generating..."}
+                      {creationMode === "script" ? "Analyzing..." : creationMode === "video_upload" ? "Processing..." : "Generating..."}
                     </>
                   ) : (
                     <>
-                      {creationMode === "script" ? "Analyze Script" : "Generate Content"}
+                      {creationMode === "script" ? "Analyze Script" : creationMode === "video_upload" ? "Upload & Generate" : "Generate Content"}
                       <ArrowRight className="h-5 w-5" />
                     </>
                   )}
