@@ -88,10 +88,25 @@ const InstagramIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+const YouTubeIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className || "h-5 w-5"} fill="currentColor">
+    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+  </svg>
+);
+
+const TikTokIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className || "h-5 w-5"} fill="currentColor">
+    <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.65-1.62-1.1-.04 1.86.04 3.73-.04 5.6-.18 4.41-3.1 8.35-7.4 9.05C6.2 23.03 2.55 21 1.05 17.65c-.9-1.99-.87-4.31.17-6.23 1.07-1.96 3.23-3.08 5.44-2.88V12.7c-3.1-.14-5.32 2.62-4.72 5.66.44 2.19 2.5 3.93 4.74 3.79 2.15-.12 4.09-1.85 4.2-4.04.09-2.58-.02-5.16.02-7.74.02-2.73.04-5.46.04-8.19 2.45-3.04 3.25-3.01 5.92-3.02 5.92z" />
+  </svg>
+);
+
 const PLATFORM_CONFIG = [
   { id: "linkedin", label: "LinkedIn", icon: LinkedInIcon },
   { id: "instagram", label: "Instagram", icon: InstagramIcon },
   { id: "twitter", label: "Twitter/X", icon: XIcon },
+  { id: "x", label: "Twitter/X", icon: XIcon },
+  { id: "tiktok", label: "TikTok", icon: TikTokIcon },
+  { id: "youtube", label: "YouTube Shorts", icon: YouTubeIcon },
   { id: "threads", label: "Threads", icon: ThreadsIcon },
   { id: "reddit", label: "Reddit", icon: RedditIcon },
 ];
@@ -306,6 +321,7 @@ const GeneratePage = () => {
   const [uploadIntent, setUploadIntent] = useState<UploadIntent | null>(null);
   const [uploadMetadata, setUploadMetadata] = useState<{ fileName: string; duration: number; wordCount: number; transcriptLength: number; transcriptConfidence: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [hasXPremium, setHasXPremium] = useState(false);
 
   // Platforms come from user profile (set during onboarding or in settings) - not selectable here
   const userPlatforms = profile?.platforms || ["linkedin", "twitter"];
@@ -520,6 +536,7 @@ const GeneratePage = () => {
             tone: creationMode === "brief_topic" ? tone : undefined,
             script_text: creationMode === "script" ? scriptText : undefined,
             platforms: userPlatforms,
+            is_x_premium: hasXPremium,
           },
           headers: {
             Authorization: `Bearer ${session?.access_token}`,
@@ -664,6 +681,7 @@ const GeneratePage = () => {
           platforms: userPlatforms,
           upload_context: processedContext,
           upload_intent: processedIntent,
+          is_x_premium: hasXPremium,
         },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
@@ -1338,27 +1356,52 @@ const GeneratePage = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex flex-wrap gap-2">
-                    {userPlatforms.length > 0 ? (
-                      userPlatforms.map((platformId) => {
-                        const platform = PLATFORM_CONFIG.find(p => p.id === platformId);
-                        return (
-                          <Badge
-                            key={platformId}
-                            variant="secondary"
-                            className="px-3 py-1.5 text-sm flex items-center"
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-wrap gap-2">
+                      {userPlatforms.length > 0 ? (
+                        userPlatforms.map((platformId) => {
+                          const platform = PLATFORM_CONFIG.find(p => p.id === platformId);
+                          return (
+                            <Badge
+                              key={platformId}
+                              variant="secondary"
+                              className="px-3 py-1.5 text-sm flex items-center"
+                            >
+                              <span className="mr-1.5 flex items-center">
+                                {platform?.icon ? <platform.icon className="h-4 w-4" /> : "📝"}
+                              </span>
+                              {platform?.label || platformId}
+                            </Badge>
+                          );
+                        })
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          No platforms selected. <a href="/dashboard/settings?tab=platforms" className="text-primary hover:underline">Select platforms</a>
+                        </p>
+                      )}
+                    </div>
+
+                    {userPlatforms.some(p => p === "twitter" || p === "x") && (
+                      <div className="flex items-center space-x-2 border-t pt-4">
+                        <input
+                          type="checkbox"
+                          id="x-premium"
+                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                          checked={hasXPremium}
+                          onChange={(e) => setHasXPremium(e.target.checked)}
+                        />
+                        <div className="grid gap-1.5 leading-none">
+                          <label
+                            htmlFor="x-premium"
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                           >
-                            <span className="mr-1.5 flex items-center">
-                              {platform?.icon ? <platform.icon className="h-4 w-4" /> : "📝"}
-                            </span>
-                            {platform?.label || platformId}
-                          </Badge>
-                        );
-                      })
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        No platforms selected. <a href="/dashboard/settings?tab=platforms" className="text-primary hover:underline">Select platforms</a>
-                      </p>
+                            Enable X Premium (25,000 chars)
+                          </label>
+                          <p className="text-xs text-muted-foreground">
+                            If checked, we'll generate longer, detailed posts for X instead of short threads.
+                          </p>
+                        </div>
+                      </div>
                     )}
                   </div>
                 </CardContent>

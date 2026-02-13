@@ -52,31 +52,31 @@ const getSafeErrorMessage = (error: unknown): string => {
 
     // Pass through intentional user-facing errors
     if (msg.includes("insufficient_credits") || msg.includes("limit exceeded") ||
-        msg.includes("limit reached") || msg.includes("at least one platform")) {
+      msg.includes("limit reached") || msg.includes("at least one platform")) {
       return error.message;
     }
 
     // Auth errors
     if (msg.includes("not authenticated") || msg.includes("jwt") ||
-        msg.includes("authorization") || msg.includes("no authorization header")) {
+      msg.includes("authorization") || msg.includes("no authorization header")) {
       return "Authentication required. Please log in again.";
     }
 
     // Configuration errors
     if (msg.includes("not set") || msg.includes("not configured") ||
-        msg.includes("_key") || msg.includes("_secret")) {
+      msg.includes("_key") || msg.includes("_secret")) {
       return "Service temporarily unavailable. Please try again later.";
     }
 
     // Validation errors - pass through with generic message
     if (msg.includes("required") || msg.includes("invalid") ||
-        msg.includes("must be") || msg.includes("at least")) {
+      msg.includes("must be") || msg.includes("at least")) {
       return "Invalid request. Please check your input and try again.";
     }
 
     // Database/profile errors
     if (msg.includes("profile") || msg.includes("database") ||
-        msg.includes("supabase") || msg.includes("failed to get")) {
+      msg.includes("supabase") || msg.includes("failed to get")) {
       return "Unable to load your profile. Please try again.";
     }
 
@@ -140,6 +140,7 @@ const generateContentSchema = z.object({
     key_takeaways: z.array(z.string()),
     inference_confidence: z.number().optional(),
   }).optional(),
+  is_x_premium: z.boolean().optional(),
 }).refine(
   (data) => {
     if (data.mode === "brief_topic") {
@@ -162,9 +163,10 @@ const generateContentSchema = z.object({
 // Platform-specific formatting instructions
 const PLATFORM_INSTRUCTIONS: Record<string, string> = {
   linkedin: "Format for LinkedIn: Professional tone, use line breaks for readability, start with a hook, include relevant emojis sparingly, end with a question or call-to-action. Optimal length: 1200-1500 characters.",
-  instagram: "Format for Instagram: Casual and engaging, use emojis, break into short paragraphs, include a strong hook in the first line, end with a call-to-action. Optimal length: 800-1000 characters.",
+  instagram: "Format for Instagram Reels: Create a structured video script. Include timestamps (e.g., 0:00-0:03). Sections: Hook (Visual & Audio), Retaining Setup, Value Delivery, and Call-to-Action. Include specific visual directions/editing advice for each section. Also provide a short, engaging caption with hashtags.",
+  tiktok: "Format for TikTok: Create a fast-paced video script. Include timestamps. Focus on a viral hook in the first 2 seconds. Sections: Hook, Re-hook, Value/Story, CTA. Include trends or specific visual/editing notes (e.g., green screen, text overlay). Also provide a caption.",
   twitter: "Format for Twitter/X: Punchy and direct, under 280 characters, use thread format (🧵) if needed, include 1-2 relevant hashtags. Focus on the hook.",
-  youtube: "Format for YouTube Shorts script: Structure as Hook (0-3s), Setup (3-10s), Main Points (10-45s), CTA (45-60s). Include timestamps and speaking notes.",
+  youtube: "Format for YouTube Shorts script: Structure as Hook (0-3s), Setup (3-10s), Main Points (10-45s), CTA (45-60s). Include timestamps and speaking notes. Provide specific visual/b-roll suggestions.",
   threads: "Format for Threads: Conversational, authentic, use line breaks, can be longer than Twitter. Start with a hot take or question.",
   reddit: "Format for Reddit: Use markdown with bold headers, be informative, invite discussion, match the subreddit style. Include a TL;DR if long.",
 };
@@ -214,19 +216,19 @@ serve(async (req) => {
     // Validate request body
     const body = await req.json();
     const validation = generateContentSchema.safeParse(body);
-    
+
     if (!validation.success) {
       logStep("Validation failed", { errors: validation.error.issues.map(i => i.message) });
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: "Invalid request parameters",
           details: validation.error.issues.map(i => i.message)
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    
-    const { mode, topic, audience, intent, tone, script_text, platforms, video_context, video_intent, upload_context, upload_intent } = validation.data;
+
+    const { mode, topic, audience, intent, tone, script_text, platforms, video_context, video_intent, upload_context, upload_intent, is_x_premium } = validation.data;
     logStep("Request validated", { mode, platformCount: platforms.length });
 
     // Get user plan and usage
@@ -265,11 +267,11 @@ serve(async (req) => {
 
     // If no rows updated, user is at/over limit (race condition caught)
     if (creditError || !creditDeduction) {
-      logStep("Credit deduction failed (race condition or limit reached)", { 
-        used: usedThisMonth, 
-        limit: userProfile.monthly_generation_limit 
+      logStep("Credit deduction failed (race condition or limit reached)", {
+        used: usedThisMonth,
+        limit: userProfile.monthly_generation_limit
       });
-      return new Response(JSON.stringify({ 
+      return new Response(JSON.stringify({
         error: "insufficient_credits",
         message: "You've reached your monthly generation limit. Upgrade your plan for more credits.",
         used: usedThisMonth,
@@ -280,9 +282,9 @@ serve(async (req) => {
       });
     }
 
-    logStep("Credit deducted atomically", { 
+    logStep("Credit deducted atomically", {
       newUsage: creditDeduction.generations_used_this_month,
-      limit: creditDeduction.monthly_generation_limit 
+      limit: creditDeduction.monthly_generation_limit
     });
 
     // Get Lovable AI key
@@ -294,8 +296,8 @@ serve(async (req) => {
     const planTier = userPlan.includes("pro") ? "pro" : userPlan.includes("creator") ? "creator" : "free";
     logStep("Plan tier for generation", { planTier });
 
-        // Plan-specific analysis depth instructions
-        const analysisDepthByPlan: Record<string, string> = {
+    // Plan-specific analysis depth instructions
+    const analysisDepthByPlan: Record<string, string> = {
       free: `Provide basic analysis:
     - Give scores as rough estimates (clarity, hook, engagement, structure)
     - List exactly 2 strengths and 2 improvements
@@ -315,10 +317,10 @@ serve(async (req) => {
     - Suggest A/B testing variations for hooks
     - Analyze emotional triggers and audience retention patterns
     - Write analysis like private notes between strategists; be direct and assume nuance`,
-        };
+    };
 
-        // Plan-specific content quality instructions
-        const contentQualityByPlan: Record<string, string> = {
+    // Plan-specific content quality instructions
+    const contentQualityByPlan: Record<string, string> = {
       free: `Write clear, readable content that gets the point across.
 
     Priorities:
@@ -354,11 +356,11 @@ serve(async (req) => {
     - Over-formatting
 
     Do not try to sound impressive. Try to sound certain.`,
-        };
+    };
 
     // Construct the prompt based on mode
     let contentPrompt: string;
-    
+
     if (mode === "brief_topic") {
       contentPrompt = `
 You are creating social media content based on the following brief:
@@ -463,11 +465,17 @@ Your tasks:
 
     // Build platform instructions
     const platformInstructions = platforms
-      .map(p => PLATFORM_INSTRUCTIONS[p.toLowerCase()] || `Format for ${p}: Create platform-appropriate content.`)
+      .map(p => {
+        const key = p.toLowerCase();
+        if ((key === "twitter" || key === "x") && is_x_premium) {
+          return "Format for Twitter/X (Premium): Detailed and in-depth, up to 25,000 characters. Use long-form post formatting with bold headers (if supported) or clear sections. Do not use thread format. Focus on providing deep value without the 280 character constraint.";
+        }
+        return PLATFORM_INSTRUCTIONS[key] || `Format for ${p}: Create platform-appropriate content.`;
+      })
       .join("\n\n");
 
-        // Full system prompt - differentiated by plan
-        const systemPromptByPlan: Record<string, string> = {
+    // Full system prompt - differentiated by plan
+    const systemPromptByPlan: Record<string, string> = {
       free: `You are a helpful junior content creator.
 
     You write clearly and naturally, like a real person explaining something they understand.
@@ -492,7 +500,7 @@ Your tasks:
 
     Your writing should feel confident but not promotional, insightful without sounding instructional, sharp, slightly opinionated, and deliberate.
     Nothing you write should feel generic or safe. If a sentence does not add leverage, remove it.`,
-        };
+    };
 
     const fullPrompt = `${contentPrompt}
 
@@ -541,7 +549,7 @@ Return ONLY valid JSON, no markdown code blocks or additional text.`;
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
       logStep("AI gateway error", { status: aiResponse.status });
-      
+
       if (aiResponse.status === 429) {
         return new Response(JSON.stringify({ error: "rate_limited", message: "Too many requests. Please try again in a moment." }), {
           status: 429,
@@ -559,7 +567,7 @@ Return ONLY valid JSON, no markdown code blocks or additional text.`;
 
     const aiData = await aiResponse.json();
     const aiContent = aiData.choices?.[0]?.message?.content;
-    
+
     if (!aiContent) {
       throw new Error("No content returned from AI");
     }
@@ -603,7 +611,7 @@ Return ONLY valid JSON, no markdown code blocks or additional text.`;
   } catch (error) {
     const detailedError = error instanceof Error ? error.message : String(error);
     logStep("ERROR", { message: sanitizeForLog(detailedError) });
-    
+
     const safeMessage = getSafeErrorMessage(error);
     return new Response(JSON.stringify({ error: safeMessage }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
