@@ -39,6 +39,11 @@ const YouTubeIcon = () => (
     <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
   </svg>
 );
+const TikTokIcon = () => (
+  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+    <path d="M14 2h2.2c.3 2.2 1.8 3.9 4 4.3V8.5c-1.6-.1-3.2-.7-4.2-1.7v7.6c0 3-2.4 5.6-5.6 5.6S5 17.5 5 14.4c0-3 2.4-5.6 5.6-5.6.4 0 .8 0 1.2.1v2.4c-.4-.2-.8-.3-1.2-.3-1.7 0-3.1 1.4-3.1 3.1 0 1.8 1.4 3.1 3.1 3.1 1.8 0 3.2-1.3 3.2-3.6V2Z" />
+  </svg>
+);
 
 const platformConfig: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {
   linkedin: { icon: <LinkedInIcon />, color: "text-[#0A66C2]", bg: "bg-blue-50 border-blue-200" },
@@ -47,19 +52,25 @@ const platformConfig: Record<string, { icon: React.ReactNode; color: string; bg:
   threads: { icon: <ThreadsIcon />, color: "text-foreground", bg: "bg-gray-50 border-gray-200" },
   reddit: { icon: <RedditIcon />, color: "text-[#FF4500]", bg: "bg-orange-50 border-orange-200" },
   instagram: { icon: <InstagramIcon />, color: "text-[#E4405F]", bg: "bg-pink-50 border-pink-200" },
+  "instagram reels": { icon: <InstagramIcon />, color: "text-[#E4405F]", bg: "bg-pink-50 border-pink-200" },
   youtube: { icon: <YouTubeIcon />, color: "text-[#FF0000]", bg: "bg-red-50 border-red-200" },
   "youtube shorts": { icon: <YouTubeIcon />, color: "text-[#FF0000]", bg: "bg-red-50 border-red-200" },
+  tiktok: { icon: <TikTokIcon />, color: "text-foreground", bg: "bg-gray-50 border-gray-200" },
 };
+
+const getPlatformConfig = (platform: string) => platformConfig[platform] || platformConfig.linkedin;
 
 const platformLabel = (p: string) => {
   const v = p.toLowerCase();
   if (v === "twitter" || v === "x") return "Twitter/X";
   if (v === "linkedin") return "LinkedIn";
   if (v === "instagram") return "Instagram";
+  if (v === "instagram reels") return "Instagram Reels";
   if (v === "threads") return "Threads";
   if (v === "reddit") return "Reddit";
   if (v === "youtube") return "YouTube";
   if (v === "youtube shorts") return "YouTube Shorts";
+  if (v === "tiktok") return "TikTok";
   return p;
 };
 
@@ -73,12 +84,20 @@ interface BeautifulContentModalProps {
 const BeautifulContentModal = ({ open, onOpenChange, generation, notes }: BeautifulContentModalProps) => {
   const [copiedPlatform, setCopiedPlatform] = useState<string | null>(null);
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
+  const [isInputExpanded, setIsInputExpanded] = useState(false);
 
   const currentPlatform = useMemo(() => {
     if (!generation) return null;
     const platform = selectedPlatform || generation.outputs[0]?.platform?.toLowerCase() || "linkedin";
     return generation.outputs.find((o) => o.platform?.toLowerCase() === platform) || generation.outputs[0];
   }, [generation, selectedPlatform]);
+
+  const inputPreview = useMemo(() => {
+    const input = generation?.original_input || "";
+    if (!input) return "";
+    const maxLength = 220;
+    return input.length > maxLength ? `${input.slice(0, maxLength).trim()}...` : input;
+  }, [generation]);
 
   if (!generation || !currentPlatform) return null;
 
@@ -117,7 +136,7 @@ const BeautifulContentModal = ({ open, onOpenChange, generation, notes }: Beauti
                 <div className="flex gap-2 flex-wrap">
                   {generation.outputs.map((output, i) => {
                     const platform = output.platform?.toLowerCase() || "linkedin";
-                    const config = platformConfig[platform] || platformConfig.linkedin;
+                    const config = getPlatformConfig(platform);
                     const isActive = selectedPlatform === platform || (!selectedPlatform && i === 0);
 
                     return (
@@ -143,33 +162,6 @@ const BeautifulContentModal = ({ open, onOpenChange, generation, notes }: Beauti
               {/* Content Area */}
               <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
                 <div className="p-6 space-y-5">
-                  {/* Original Input */}
-                  {generation.original_input && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.05 }}
-                      className="space-y-2"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="p-1.5 rounded-lg bg-blue-100">
-                          <FileText className="h-3.5 w-3.5 text-blue-600" />
-                        </div>
-                        <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-xs font-semibold">
-                          Your Idea
-                        </Badge>
-                        {generation.input_type && (
-                          <Badge variant="outline" className="text-xs capitalize">
-                            {generation.input_type}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="rounded-xl border bg-blue-50/50 border-blue-100 p-4 text-sm whitespace-pre-wrap leading-relaxed">
-                        {generation.original_input}
-                      </div>
-                    </motion.div>
-                  )}
-
                   {/* Generated Content */}
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
@@ -180,10 +172,10 @@ const BeautifulContentModal = ({ open, onOpenChange, generation, notes }: Beauti
                     <div className="flex items-center gap-3">
                       <motion.div
                         whileHover={{ scale: 1.05 }}
-                        className={`p-2.5 rounded-xl border ${platformConfig[currentPlatform.platform?.toLowerCase() || "linkedin"].bg}`}
+                        className={`p-2.5 rounded-xl border ${getPlatformConfig(currentPlatform.platform?.toLowerCase() || "linkedin").bg}`}
                       >
-                        <span className={platformConfig[currentPlatform.platform?.toLowerCase() || "linkedin"].color}>
-                          {platformConfig[currentPlatform.platform?.toLowerCase() || "linkedin"].icon}
+                        <span className={getPlatformConfig(currentPlatform.platform?.toLowerCase() || "linkedin").color}>
+                          {getPlatformConfig(currentPlatform.platform?.toLowerCase() || "linkedin").icon}
                         </span>
                       </motion.div>
                       <div className="flex-1">
@@ -233,6 +225,46 @@ const BeautifulContentModal = ({ open, onOpenChange, generation, notes }: Beauti
                       </motion.div>
                     </div>
                   </motion.div>
+
+                  {/* Original Input */}
+                  {generation.original_input && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.15 }}
+                      className="space-y-2"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 rounded-lg bg-blue-100">
+                          <FileText className="h-3.5 w-3.5 text-blue-600" />
+                        </div>
+                        <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-xs font-semibold">
+                          Your Script
+                        </Badge>
+                        {generation.input_type && (
+                          <Badge variant="outline" className="text-xs capitalize">
+                            {generation.input_type}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="rounded-xl border bg-blue-50/50 border-blue-100 p-4 text-sm whitespace-pre-wrap leading-relaxed">
+                        {isInputExpanded ? generation.original_input : inputPreview}
+                      </div>
+                      {generation.original_input.length > inputPreview.length && (
+                        <div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="px-2"
+                            onClick={() => setIsInputExpanded((prev) => !prev)}
+                          >
+                            {isInputExpanded ? "Show less" : "Read more"}
+                          </Button>
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
 
                   {/* Notes Section */}
                   {notes && notes.length > 0 && (

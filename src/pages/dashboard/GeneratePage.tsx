@@ -20,9 +20,7 @@ import {
   Sparkles,
   Check,
   Copy,
-  BarChart2,
   Lightbulb,
-  Zap,
   Lock,
   AlertCircle,
   Plus,
@@ -45,13 +43,6 @@ interface DashboardContext {
 
 type Step = 1 | 2 | 3 | 4;
 type CreationMode = "brief_topic" | "script" | "video_upload";
-
-const steps = [
-  { number: 1, name: "Input", icon: FileText },
-  { number: 2, name: "Analysis", icon: BarChart2 },
-  { number: 3, name: "Improve", icon: Lightbulb },
-  { number: 4, name: "Outputs", icon: Zap },
-];
 
 const AUDIENCE_OPTIONS = ["Students", "Founders", "Professionals", "General audience"];
 const INTENT_OPTIONS = ["Explain", "Teach", "Share an opinion", "Tell a story"];
@@ -112,9 +103,10 @@ const PLATFORM_CONFIG = [
 ];
 
 const TEXT_GENERATION_STAGES = [
-  "Analyzing the given prompt",
-  "Generating the content",
-  "Improving the content for platforms",
+  "Analyzing the content",
+  "Fine tuning the content",
+  "Comparing alternatives",
+  "Generating the best style of content",
 ];
 
 
@@ -372,12 +364,7 @@ const GeneratePage = () => {
   }, [user?.id]);
 
   useEffect(() => {
-    if (!isProcessing || currentStep !== 1 || creationMode === "video_upload") return;
-    setTextStageIndex(0);
-    const intervalId = window.setInterval(() => {
-      setTextStageIndex((prev) => (prev + 1) % TEXT_GENERATION_STAGES.length);
-    }, 1400);
-    return () => window.clearInterval(intervalId);
+    // Only used for video upload processing now
   }, [creationMode, currentStep, isProcessing]);
 
   const selectedProjectLabel = useMemo(() => {
@@ -915,49 +902,6 @@ const GeneratePage = () => {
           </div>
         </div>
 
-        {/* Progress Steps */}
-        <div className="relative">
-          <div className="absolute top-5 left-0 right-0 h-0.5 bg-muted" />
-          <motion.div
-            className="absolute top-5 left-0 h-0.5 bg-primary"
-            initial={{ width: "0%" }}
-            animate={{ width: `${((currentStep - 1) / 3) * 100}%` }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
-          />
-          <div className="relative flex justify-between">
-            {steps.map((step) => {
-              const isActive = currentStep === step.number;
-              const isCompleted = currentStep > step.number;
-              return (
-                <div
-                  key={step.number}
-                  className={`flex flex-col items-center ${isCompleted ? "cursor-pointer" : ""}`}
-                  onClick={() => isCompleted && setCurrentStep(step.number as Step)}
-                >
-                  <motion.div
-                    animate={{
-                      scale: isActive ? 1.1 : 1,
-                      backgroundColor: isCompleted || isActive ? "hsl(var(--primary))" : "hsl(var(--muted))",
-                    }}
-                    transition={{ duration: 0.2 }}
-                    className={`h-10 w-10 rounded-full flex items-center justify-center z-10 ${isCompleted || isActive ? "text-primary-foreground" : "text-muted-foreground"
-                      }`}
-                  >
-                    {isCompleted ? (
-                      <Check className="h-5 w-5" />
-                    ) : (
-                      <step.icon className="h-5 w-5" />
-                    )}
-                  </motion.div>
-                  <span className={`text-sm mt-2 font-medium ${isActive ? "text-primary" : "text-muted-foreground"}`}>
-                    {step.name}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
         {/* Step Content */}
         <AnimatePresence mode="wait">
           {/* Step 1: Input */}
@@ -1308,21 +1252,15 @@ const GeneratePage = () => {
                           </div>
                         </div>
                         <div className="mt-4 space-y-3">
-                          <Progress value={activeStageProgress} className="h-2" />
-                          <div className="space-y-1">
-                            {activeStageList.map((stage, index) => (
-                              <div
-                                key={stage}
-                                className={`flex items-center gap-2 text-xs ${index === activeStageIndex ? "text-foreground" : "text-muted-foreground"
-                                  }`}
-                              >
-                                <span
-                                  className={`h-2 w-2 rounded-full ${index <= activeStageIndex ? "bg-primary" : "bg-muted"
-                                    }`}
-                                />
-                                <span>{stage}</span>
-                              </div>
-                            ))}
+                          <div className="flex items-center gap-3">
+                            <motion.div
+                              className="h-10 w-10 rounded-full border-2 border-primary/20 border-t-primary"
+                              animate={{ rotate: 360 }}
+                              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                            />
+                            <div className="text-xs text-muted-foreground">
+                              Please keep this tab open while we work.
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1620,7 +1558,7 @@ const GeneratePage = () => {
                         <TabsList className="w-full flex-wrap h-auto gap-1 bg-muted/50 p-1">
                           {platformTabs.map((platform) => {
                             const platformConfig = PLATFORM_CONFIG.find(
-                              p => platform.platform.toLowerCase().includes(p.id) || p.id.includes(platform.platform.toLowerCase())
+                              p => platform.platform.toLowerCase() === p.id || platform.platform.toLowerCase().includes(p.id)
                             );
                             return (
                               <TabsTrigger
@@ -1805,16 +1743,18 @@ const GeneratePage = () => {
                 <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                   {!variantsSaved && (
                     <>
-                      <Button
-                        variant="hero"
-                        size="lg"
-                        onClick={handleSaveSelectedToProject}
-                        disabled={isProcessing || Object.keys(selectedVariantByPlatform).length === 0}
-                        className="gap-2"
-                      >
-                        <Check className="h-5 w-5" />
-                        Save to Project
-                      </Button>
+                      {selectedProjectId && (
+                        <Button
+                          variant="hero"
+                          size="lg"
+                          onClick={handleSaveSelectedToProject}
+                          disabled={isProcessing || Object.keys(selectedVariantByPlatform).length === 0}
+                          className="gap-2"
+                        >
+                          <Check className="h-5 w-5" />
+                          Save to Project
+                        </Button>
+                      )}
                       <Button variant="outline" onClick={resetFlow}>
                         <Sparkles className="h-5 w-5 mr-2" />
                         Create More

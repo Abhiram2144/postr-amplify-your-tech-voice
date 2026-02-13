@@ -41,8 +41,23 @@ const platformColors: Record<string, string> = {
   tiktok: "bg-foreground/5 text-foreground border-border",
 };
 
-const normalizePlatformKey = (value: string) =>
-  value.toLowerCase().replace(/[_-]+/g, " ").trim();
+const normalizePlatformKey = (value: string) => {
+  const normalized = value.toLowerCase().replace(/[_-]+/g, " ").trim();
+
+  if (normalized === "instagram reels" || normalized === "ig reels" || normalized === "reels") {
+    return "instagram";
+  }
+
+  if (normalized === "youtube shorts" || normalized === "shorts") {
+    return "youtube";
+  }
+
+  if (normalized === "tik tok") {
+    return "tiktok";
+  }
+
+  return normalized;
+};
 
 const PlatformLogo = ({
   platform,

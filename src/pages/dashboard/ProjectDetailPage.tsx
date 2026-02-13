@@ -54,6 +54,7 @@ const platformColors: Record<string, string> = {
   twitter: "bg-gray-800/10 text-gray-800 border-gray-300",
   threads: "bg-purple-500/10 text-purple-600 border-purple-200",
   instagram: "bg-pink-500/10 text-pink-600 border-pink-200",
+  "instagram reels": "bg-pink-500/10 text-pink-600 border-pink-200",
   reddit: "bg-orange-500/10 text-orange-600 border-orange-200",
   youtube: "bg-red-500/10 text-red-600 border-red-200",
   "youtube shorts": "bg-red-500/10 text-red-600 border-red-200",
@@ -99,6 +100,7 @@ const PlatformLogo = ({
         </svg>
       );
     case "instagram":
+    case "instagram reels":
       return (
         <svg aria-hidden="true" viewBox="0 0 24 24" className={className} fill="currentColor">
           <path d="M7 2.5h10A4.5 4.5 0 0 1 21.5 7v10A4.5 4.5 0 0 1 17 21.5H7A4.5 4.5 0 0 1 2.5 17V7A4.5 4.5 0 0 1 7 2.5Zm10 2H7A2.5 2.5 0 0 0 4.5 7v10A2.5 2.5 0 0 0 7 19.5h10a2.5 2.5 0 0 0 2.5-2.5V7A2.5 2.5 0 0 0 17 4.5Zm-5 3A4.5 4.5 0 1 1 7.5 12 4.5 4.5 0 0 1 12 7.5Zm0 2A2.5 2.5 0 1 0 14.5 12 2.5 2.5 0 0 0 12 9.5Zm5.25-2.35a1.1 1.1 0 1 1-1.1 1.1 1.1 1.1 0 0 1 1.1-1.1Z" />
@@ -129,7 +131,7 @@ const PlatformLogo = ({
 const ProjectDetailPage = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  
+
   const [project, setProject] = useState<Project | null>(null);
   const [projectLoading, setProjectLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -172,7 +174,7 @@ const ProjectDetailPage = () => {
 
   const fetchProject = useCallback(async () => {
     if (!projectId) return;
-    
+
     try {
       setProjectLoading(true);
       const { data, error } = await supabase
@@ -719,8 +721,8 @@ const ProjectDetailPage = () => {
             ? () => setNewNoteLinkedContentId(null)
             : linkTargetNoteId
               ? async () => {
-                  await updateNote(linkTargetNoteId, { content_output_id: null });
-                }
+                await updateNote(linkTargetNoteId, { content_output_id: null });
+              }
               : undefined
         }
       />
