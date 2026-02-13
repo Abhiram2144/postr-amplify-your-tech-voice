@@ -294,7 +294,7 @@ const GeneratePage = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [copiedPlatform, setCopiedPlatform] = useState<string | null>(null);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
-  const [testingMode, setTestingMode] = useState(true); // Enable testing mode by default
+  const [testingMode, setTestingMode] = useState(false); // Enable testing mode by default
   const [textStageIndex, setTextStageIndex] = useState(0);
   const [outputDetailTab, setOutputDetailTab] = useState<"content" | "analysis" | "improvements">("content");
 
@@ -906,25 +906,12 @@ const GeneratePage = () => {
             <p className="text-muted-foreground mt-1">Transform your ideas into platform-ready posts</p>
           </div>
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-            {testingMode && (
-              <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
-                Testing Mode
-              </Badge>
-            )}
             <CreditsIndicator
               label={creationMode === "video_upload" ? "Video credits" : "Text credits"}
               used={creationMode === "video_upload" ? videoCreditsUsed : undefined}
               limit={creationMode === "video_upload" ? videoCreditsLimit : undefined}
               remaining={creationMode === "video_upload" ? videoCreditsRemaining : undefined}
             />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setTestingMode(!testingMode)}
-              title={testingMode ? "Switch to real credits" : "Switch to testing mode"}
-            >
-              {testingMode ? "Disable Testing" : "Enable Testing"}
-            </Button>
           </div>
         </div>
 
