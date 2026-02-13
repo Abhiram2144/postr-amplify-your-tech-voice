@@ -5,7 +5,6 @@ import { User } from "lucide-react";
 
 const productLinks = [
   { label: "Features", href: "/product", isRoute: true },
-  { label: "Use Cases", href: "/use-cases", isRoute: true },
   { label: "Pricing", href: "/pricing", isRoute: true },
   { label: "Docs", href: "/docs", isRoute: true },
 ];

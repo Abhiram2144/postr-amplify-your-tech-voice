@@ -1,7 +1,7 @@
 import Header from "@/components/landing/Header";
 import Footer from "@/components/landing/Footer";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Play, FileText, ChevronDown, Sparkles, Zap, Video, PenTool, Globe, CheckCircle2 } from "lucide-react";
+import { ArrowRight, Play, Pause, FileText, ChevronDown, Sparkles, Zap, Video, PenTool, Globe, CheckCircle2, RotateCcw, Volume2, VolumeX, Maximize } from "lucide-react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useRef } from "react";
@@ -18,7 +18,7 @@ const videoDemos = [
     icon: Zap,
     gradient: "from-primary/20 via-primary/5 to-transparent",
     accentColor: "primary",
-    videoPlaceholder: "topic-demo",
+    videoSrc: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
     transcript: `[0:00] Start by typing a brief topic — for example, "Why developers should blog."
 [0:05] Postr instantly analyzes your input for structure, clarity, and hook potential.
 [0:12] The AI scores your idea and suggests improvements to maximize engagement.
@@ -37,7 +37,7 @@ const videoDemos = [
     icon: PenTool,
     gradient: "from-accent/20 via-accent/5 to-transparent",
     accentColor: "accent",
-    videoPlaceholder: "script-demo",
+    videoSrc: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
     transcript: `[0:00] Paste your full script or article draft into the editor.
 [0:06] Postr identifies key arguments, insights, and quotable moments.
 [0:12] The AI preserves your voice while restructuring for each platform's format.
@@ -56,7 +56,7 @@ const videoDemos = [
     icon: Video,
     gradient: "from-primary/15 via-accent/10 to-transparent",
     accentColor: "primary",
-    videoPlaceholder: "video-demo",
+    videoSrc: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
     transcript: `[0:00] Paste a YouTube link or raw video transcript.
 [0:05] Postr processes the video, extracting key topics and timestamps.
 [0:12] The AI identifies the most shareable and engaging moments.
@@ -77,6 +77,156 @@ const platformBadges = [
   { name: "Instagram Reels", color: "bg-purple-500/10 text-purple-600" },
 ];
 
+/* ─── Video Player Component ─── */
+const VideoPlayer = ({ src }: { src: string }) => {
+  // ... implementation details ...
+
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isMuted, setIsMuted] = useState(false);
+  const [volume, setVolume] = useState(1);
+  const [showControls, setShowControls] = useState(false);
+
+  const togglePlay = () => {
+    if (videoRef.current) {
+      if (isPlaying) {
+        videoRef.current.pause();
+      } else {
+        videoRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    if (videoRef.current) {
+      setCurrentTime(videoRef.current.currentTime);
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    if (videoRef.current) {
+      setDuration(videoRef.current.duration);
+    }
+  };
+
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const time = parseFloat(e.target.value);
+    if (videoRef.current) {
+      videoRef.current.currentTime = time;
+      setCurrentTime(time);
+    }
+  };
+
+  const toggleMute = () => {
+    if (videoRef.current) {
+      videoRef.current.muted = !isMuted;
+      setIsMuted(!isMuted);
+    }
+  };
+
+  const formatTime = (time: number) => {
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  };
+
+  const handleFullscreen = () => {
+    if (videoRef.current) {
+      if (videoRef.current.requestFullscreen) {
+        videoRef.current.requestFullscreen();
+      }
+    }
+  };
+
+  return (
+    <div
+      className="relative aspect-video group bg-black"
+      onMouseEnter={() => setShowControls(true)}
+      onMouseLeave={() => setShowControls(false)}
+    >
+      <video
+        ref={videoRef}
+        src={src}
+        className="w-full h-full object-cover cursor-pointer"
+        onClick={togglePlay}
+        onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={handleLoadedMetadata}
+        onEnded={() => setIsPlaying(false)}
+      />
+
+      {/* Center Play Button Overlay */}
+      {!isPlaying && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/90 shadow-xl backdrop-blur-sm"
+          >
+            <Play className="h-6 w-6 text-primary-foreground ml-1" fill="currentColor" />
+          </motion.div>
+        </div>
+      )}
+
+      {/* Controls Bar */}
+      <div
+        className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent px-4 pb-4 pt-12 transition-opacity duration-300 ${showControls || !isPlaying ? 'opacity-100' : 'opacity-0'}`}
+      >
+        {/* Progress Bar */}
+        <div className="group/slider relative h-1.5 w-full cursor-pointer rounded-full bg-white/20 hover:h-2 mb-4 transition-all">
+          <input
+            type="range"
+            min="0"
+            max={duration || 0}
+            value={currentTime}
+            onChange={handleSeek}
+            className="absolute h-full w-full opacity-0 cursor-pointer z-10"
+          />
+          <div
+            className="absolute h-full rounded-full bg-primary transition-all pointer-events-none"
+            style={{ width: `${(currentTime / duration) * 100}%` }}
+          />
+          <div
+            className="absolute h-3 w-3 rounded-full bg-white shadow-md top-1/2 -translate-y-1/2 -ml-1.5 pointer-events-none opacity-0 group-hover/slider:opacity-100 transition-opacity"
+            style={{ left: `${(currentTime / duration) * 100}%` }}
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={togglePlay}
+              className="text-white hover:text-primary transition-colors"
+            >
+              {isPlaying ? <Pause className="h-5 w-5" fill="currentColor" /> : <Play className="h-5 w-5" fill="currentColor" />}
+            </button>
+
+            <button
+              onClick={toggleMute}
+              className="text-white hover:text-primary transition-colors"
+            >
+              {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+            </button>
+
+            <span className="text-xs font-medium text-white/90 font-mono">
+              {formatTime(currentTime)} / {formatTime(duration)}
+            </span>
+          </div>
+
+          <button
+            onClick={handleFullscreen}
+            className="text-white hover:text-primary transition-colors"
+          >
+            <Maximize className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 /* ─── Video Demo Card Component ─── */
 const VideoDemoSection = ({
   demo,
@@ -88,7 +238,8 @@ const VideoDemoSection = ({
   isReversed: boolean;
 }) => {
   const [showTranscript, setShowTranscript] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
+  // Remove component-level playing state as the VideoPlayer component handles it internally
+
 
   return (
     <motion.section
@@ -104,9 +255,8 @@ const VideoDemoSection = ({
       />
 
       <div
-        className={`mx-auto flex max-w-6xl flex-col gap-12 lg:flex-row lg:items-center ${
-          isReversed ? "lg:flex-row-reverse" : ""
-        }`}
+        className={`mx-auto flex max-w-6xl flex-col gap-12 lg:flex-row lg:items-center ${isReversed ? "lg:flex-row-reverse" : ""
+          }`}
       >
         {/* Video Player Area */}
         <motion.div
@@ -117,61 +267,7 @@ const VideoDemoSection = ({
           className="flex-1"
         >
           <div className="group relative overflow-hidden rounded-2xl border border-border bg-card shadow-lg">
-            {/* Video Placeholder */}
-            <div className="relative aspect-video bg-gradient-to-br from-muted to-muted/50">
-              {/* Grid pattern overlay */}
-              <div
-                className="absolute inset-0 opacity-[0.03]"
-                style={{
-                  backgroundImage:
-                    "linear-gradient(hsl(var(--foreground)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--foreground)) 1px, transparent 1px)",
-                  backgroundSize: "32px 32px",
-                }}
-              />
-
-              {/* Center play button */}
-              <motion.button
-                onClick={() => setIsPlaying(!isPlaying)}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                className="absolute inset-0 flex items-center justify-center"
-              >
-                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/90 shadow-xl backdrop-blur-sm transition-all group-hover:bg-primary glow-effect">
-                  <Play className="h-8 w-8 text-primary-foreground ml-1" fill="currentColor" />
-                </div>
-              </motion.button>
-
-              {/* Badge overlay */}
-              <div className="absolute left-4 top-4">
-                <span className="rounded-full bg-background/80 px-3 py-1 text-xs font-semibold backdrop-blur-sm">
-                  {demo.badge}
-                </span>
-              </div>
-
-              {/* Duration overlay */}
-              <div className="absolute bottom-4 right-4">
-                <span className="rounded-md bg-background/80 px-2 py-1 text-xs font-mono backdrop-blur-sm">
-                  0:35
-                </span>
-              </div>
-            </div>
-
-            {/* Video bottom bar */}
-            <div className="flex items-center justify-between border-t border-border px-4 py-3">
-              <div className="flex items-center gap-2">
-                <div className="h-1.5 flex-1 rounded-full bg-muted w-32">
-                  <motion.div
-                    className="h-full rounded-full bg-primary"
-                    initial={{ width: "0%" }}
-                    whileInView={{ width: isPlaying ? "100%" : "0%" }}
-                    transition={{ duration: 35, ease: "linear" }}
-                  />
-                </div>
-              </div>
-              <span className="text-xs text-muted-foreground font-mono">
-                Demo Preview
-              </span>
-            </div>
+            <VideoPlayer src={demo.videoSrc} />
           </div>
 
           {/* Transcript Toggle */}
