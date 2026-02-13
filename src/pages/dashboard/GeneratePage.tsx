@@ -1110,9 +1110,9 @@ const GeneratePage = () => {
                         <div className="flex items-start gap-2">
                           <Upload className="h-5 w-5 text-primary mt-0.5" />
                           <div>
-                            <p className="font-medium text-sm text-foreground">Video Upload Intelligence</p>
+                            <p className="font-medium text-sm text-foreground">Video Reference & Upload Intelligence</p>
                             <p className="text-xs text-muted-foreground mt-0.5">
-                              Upload a short video file. We'll transcribe the audio, understand your intent, and generate platform-native content.
+                              Upload your own recording or any reference video. We'll analyze the content to generate an enhanced version, polished scripts, or platform-ready posts inspired by the source.
                             </p>
                           </div>
                         </div>
