@@ -18,6 +18,7 @@ import {
   Clock,
   Filter,
   TrendingUp,
+  Video,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -57,6 +58,15 @@ const normalizePlatformKey = (value: string) => {
   }
 
   return normalized;
+};
+
+const inputTypeLabel = (inputType: string | null | undefined) => {
+  if (!inputType) return null;
+  const normalized = inputType.toLowerCase().replace(/[_-]+/g, " ").trim();
+  if (normalized === "brief topic") return "Brief Topic";
+  if (normalized === "script") return "Script";
+  if (normalized === "video upload" || normalized === "video") return "Video";
+  return normalized.replace(/\b\w/g, (c) => c.toUpperCase());
 };
 
 const PlatformLogo = ({
@@ -195,7 +205,9 @@ const HistoryPage = () => {
     const matchesSearch =
       (gen.original_input || "").toLowerCase().includes(q) ||
       gen.outputs.some((o) => (o.content || "").toLowerCase().includes(q));
-    const matchesPlatform = platformFilter === "all" || gen.platforms.includes(platformFilter);
+    const matchesPlatform =
+      platformFilter === "all" ||
+      (platformFilter === "video" ? gen.input_type === "video_upload" : gen.platforms.includes(platformFilter));
     return matchesSearch && matchesPlatform;
   });
 
@@ -298,6 +310,7 @@ const HistoryPage = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All platforms</SelectItem>
+                <SelectItem value="video">Video</SelectItem>
                 {uniquePlatforms.map((platform) => (
                   <SelectItem key={platform} value={platform!}>
                     {platform}
@@ -354,11 +367,16 @@ const HistoryPage = () => {
                   transition={{ delay: index * 0.05 }}
                   className="group"
                 >
+                  {(() => {
+                    const isVideo = gen.input_type === "video_upload";
+                    return (
                   <motion.div
                     whileHover={{ y: -2 }}
                     transition={{ type: "spring", stiffness: 400, damping: 10 }}
                   >
-                    <Card className="hover:shadow-md hover:border-primary/50 transition-all cursor-pointer">
+                    <Card
+                      className={`hover:shadow-md hover:border-primary/50 transition-all cursor-pointer ${isVideo ? "border-primary/30 bg-primary/5" : ""}`}
+                    >
                       <CardContent className="p-3 sm:p-4">
 
                         <button
@@ -403,6 +421,17 @@ const HistoryPage = () => {
                                     📁 {gen.project_title}
                                   </Badge>
                                 )}
+                                {gen.input_type && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {inputTypeLabel(gen.input_type) ?? "Mode"}
+                                  </Badge>
+                                )}
+                                {isVideo && (
+                                  <div className="flex items-center gap-1.5 text-xs text-primary">
+                                    <Video className="h-3.5 w-3.5" />
+                                    <span className="font-medium">Video</span>
+                                  </div>
+                                )}
                               </div>
 
                               {/* Score and Date */}
@@ -433,7 +462,7 @@ const HistoryPage = () => {
                             {/* Input Preview */}
                             <div>
                               <p className="text-sm text-muted-foreground line-clamp-2 group-hover:text-foreground transition-colors">
-                                {gen.original_input || "No description"}
+                                {gen.original_input || (gen.input_type === "video_upload" ? "Video upload" : "No description")}
                               </p>
                             </div>
 
@@ -446,6 +475,8 @@ const HistoryPage = () => {
                       </CardContent>
                     </Card>
                   </motion.div>
+                  );
+                  })()}
                   </motion.div>
               ))}
             </motion.div>

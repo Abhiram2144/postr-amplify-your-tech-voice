@@ -325,6 +325,8 @@ const GeneratePage = () => {
   const [selectedVariantByPlatform, setSelectedVariantByPlatform] = useState<Record<string, string>>({});
   const [hasGeneratedAnother, setHasGeneratedAnother] = useState(false);
   const [variantsSaved, setVariantsSaved] = useState(false);
+  const [isAppending, setIsAppending] = useState(false);
+  const [autoSavedToLibrary, setAutoSavedToLibrary] = useState(false);
 
   useEffect(() => {
     // Prefill topic from URL (e.g. converting a note -> generate)
@@ -437,7 +439,22 @@ const GeneratePage = () => {
     return true;
   }, [currentStep, creationMode, topic, scriptText, userPlatforms.length, uploadFile]);
 
-  const persistOutputs = async (projectId: string | null, payload: { analysis: AnalysisResult; outputs: PlatformOutput[] }, source: 'ai' | 'mock' | 'video_transcript' = 'ai') => {
+  const buildOriginalInput = () => {
+    if (creationMode === "script") return scriptText.trim();
+    if (creationMode === "video_upload") {
+      const parts = ["Video upload"];
+      if (uploadMetadata?.fileName) parts.push(uploadMetadata.fileName);
+      if (uploadIntent?.core_message) parts.push(uploadIntent.core_message);
+      return parts.filter(Boolean).join(" - ");
+    }
+    return topic.trim();
+  };
+
+  const persistOutputs = async (
+    projectId: string | null,
+    payload: { analysis: AnalysisResult; outputs: PlatformOutput[] },
+    source: "ai" | "mock" | "video_transcript" = "ai",
+  ) => {
     if (!projectId) return;
 
     const generationId = crypto.randomUUID();
@@ -446,7 +463,7 @@ const GeneratePage = () => {
       (payload.analysis.clarityScore + payload.analysis.hookStrength + payload.analysis.engagementScore + payload.analysis.structureScore) / 4,
     );
 
-    const originalInput = creationMode === "script" ? scriptText.trim() : topic.trim();
+    const originalInput = buildOriginalInput();
 
     const rows = payload.outputs.map((o) => ({
       project_id: projectId,
@@ -465,6 +482,30 @@ const GeneratePage = () => {
 
     const { error } = await supabase.from("content_outputs").insert(rows);
     if (error) throw error;
+  };
+
+  const autoSaveToLibrary = async (
+    payload: { analysis: AnalysisResult; outputs: PlatformOutput[] },
+    source: "ai" | "mock" | "video_transcript",
+  ) => {
+    if (testingMode || selectedProjectId) return;
+
+    try {
+      const libraryProject = await getOrCreateDefaultProject();
+      await persistOutputs(libraryProject.id, payload, source);
+      setAutoSavedToLibrary(true);
+      toast({
+        title: "Saved to Content Library",
+        description: "This generation is now available in your library.",
+      });
+    } catch (error) {
+      console.error("Auto-save failed:", error);
+      toast({
+        title: "Auto-save failed",
+        description: error instanceof Error ? error.message : "Could not save to Content Library.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleCopy = async (copyKey: string, content: string, label: string) => {
@@ -486,6 +527,9 @@ const GeneratePage = () => {
       setIsProcessing(true);
       setTimeout(() => {
         addOutputVariant({ analysis: MOCK_VIDEO_ANALYSIS.analysis, outputs: MOCK_VIDEO_ANALYSIS.outputs }, append);
+        if (!testingMode) {
+          autoSaveToLibrary({ analysis: MOCK_VIDEO_ANALYSIS.analysis, outputs: MOCK_VIDEO_ANALYSIS.outputs }, "mock");
+        }
         if (!append) {
           setOutputDetailTab("content");
           setCurrentStep(4);
@@ -497,6 +541,9 @@ const GeneratePage = () => {
           });
         }
         setIsProcessing(false);
+        if (append) {
+          setIsAppending(false);
+        }
       }, 1500);
       return;
     }
@@ -544,6 +591,7 @@ const GeneratePage = () => {
       })();
 
       addOutputVariant({ analysis: generated.analysis, outputs: generated.outputs }, append);
+      await autoSaveToLibrary({ analysis: generated.analysis, outputs: generated.outputs }, "ai");
 
       if (!testingMode && generated.credits?.used !== undefined) {
         updateCreditsAfterGeneration(generated.credits.used);
@@ -575,6 +623,9 @@ const GeneratePage = () => {
       });
     } finally {
       setIsProcessing(false);
+      if (append) {
+        setIsAppending(false);
+      }
     }
   };
 
@@ -689,6 +740,11 @@ const GeneratePage = () => {
         outputs: genData.outputs as PlatformOutput[],
       }, append);
 
+      await autoSaveToLibrary({
+        analysis: genData.analysis as AnalysisResult,
+        outputs: genData.outputs as PlatformOutput[],
+      }, "video_transcript");
+
       if (genData.credits?.used !== undefined) {
         updateCreditsAfterGeneration(genData.credits.used);
       }
@@ -719,6 +775,9 @@ const GeneratePage = () => {
       });
     } finally {
       setIsProcessing(false);
+      if (append) {
+        setIsAppending(false);
+      }
       setTimeout(() => setUploadProcessingStep("idle"), 3000);
     }
   };
@@ -769,7 +828,12 @@ const GeneratePage = () => {
       for (const variantId of uniqueVariantIds) {
         const variant = outputVariants.find((v) => v.id === variantId);
         if (variant) {
-          await persistOutputs(resolvedProject.id, { analysis: variant.analysis, outputs: variant.outputs }, testingMode ? "mock" : "ai");
+          const sourceType = creationMode === "video_upload"
+            ? "video_transcript"
+            : testingMode
+              ? "mock"
+              : "ai";
+          await persistOutputs(resolvedProject.id, { analysis: variant.analysis, outputs: variant.outputs }, sourceType);
         }
       }
 
@@ -805,6 +869,7 @@ const GeneratePage = () => {
     setSelectedVariantByPlatform({});
     setHasGeneratedAnother(false);
     setVariantsSaved(false);
+    setAutoSavedToLibrary(false);
     // Reset upload state
     setUploadFile(null);
     setUploadProcessingStep("idle");
@@ -861,6 +926,7 @@ const GeneratePage = () => {
 
   const handleGenerateAnother = async () => {
     if (isProcessing) return;
+    setIsAppending(true);
     await handleGenerate(true);
   };
 
@@ -1215,7 +1281,13 @@ const GeneratePage = () => {
                     <Label>Link to a project (optional)</Label>
                     <Select
                       value={selectedProjectId ?? "__none__"}
-                      onValueChange={(v) => setSelectedProjectId(v === "__none__" ? null : v)}
+                      onValueChange={(v) => {
+                        const nextProjectId = v === "__none__" ? null : v;
+                        setSelectedProjectId(nextProjectId);
+                        if (nextProjectId) {
+                          setAutoSavedToLibrary(false);
+                        }
+                      }}
                       disabled={projectsLoading}
                     >
                       <SelectTrigger className="w-full">
@@ -1231,7 +1303,7 @@ const GeneratePage = () => {
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
-                      Link a project if you want this generation to appear in Projects and History.
+                      If you don't link a project, we'll save it to your Content Library.
                     </p>
                   </div>
 
@@ -1528,11 +1600,25 @@ const GeneratePage = () => {
                         disabled={isProcessing}
                         className="gap-2"
                       >
-                        <Sparkles className="h-4 w-4" />
-                        Generate Another
+                        {isAppending ? (
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          >
+                            <Sparkles className="h-4 w-4" />
+                          </motion.div>
+                        ) : (
+                          <Sparkles className="h-4 w-4" />
+                        )}
+                        {isAppending ? "Generating..." : "Generate Another"}
                       </Button>
                     )}
                   </div>
+                  {autoSavedToLibrary && !selectedProjectId && (
+                    <div className="rounded-md border border-primary/20 bg-primary/10 px-3 py-2 text-xs text-primary">
+                      Saved to Content Library.
+                    </div>
+                  )}
                   {outputVariants.length > 1 && (
                     <p className="text-xs text-muted-foreground">
                       Compare options side by side and pick your favorite per platform.
@@ -1741,20 +1827,18 @@ const GeneratePage = () => {
                   Back
                 </Button>
                 <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                  {!variantsSaved && (
+                  {!variantsSaved && (!autoSavedToLibrary || selectedProjectId) && (
                     <>
-                      {selectedProjectId && (
-                        <Button
-                          variant="hero"
-                          size="lg"
-                          onClick={handleSaveSelectedToProject}
-                          disabled={isProcessing || Object.keys(selectedVariantByPlatform).length === 0}
-                          className="gap-2"
-                        >
-                          <Check className="h-5 w-5" />
-                          Save to Project
-                        </Button>
-                      )}
+                      <Button
+                        variant="hero"
+                        size="lg"
+                        onClick={handleSaveSelectedToProject}
+                        disabled={isProcessing || Object.keys(selectedVariantByPlatform).length === 0}
+                        className="gap-2"
+                      >
+                        <Check className="h-5 w-5" />
+                        {selectedProjectId ? "Save to Project" : "Save to Library"}
+                      </Button>
                       <Button variant="outline" onClick={resetFlow}>
                         <Sparkles className="h-5 w-5 mr-2" />
                         Create More
