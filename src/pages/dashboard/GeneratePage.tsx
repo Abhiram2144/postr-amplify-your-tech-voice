@@ -31,6 +31,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCredits } from "@/hooks/useCredits";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useVideoUsage } from "@/hooks/useVideoUsage";
 import { useToast } from "@/hooks/use-toast";
 import InsufficientCreditsModal from "@/components/dashboard/InsufficientCreditsModal";
 import CreditsIndicator from "@/components/dashboard/CreditsIndicator";
@@ -274,6 +275,7 @@ const GeneratePage = () => {
   const { user, session } = useAuth();
   const { creditsUsed, creditsLimit, creditsRemaining, updateCreditsAfterGeneration } = useCredits();
   const { plan } = useSubscription();
+  const { videoUsed, refreshVideoUsage } = useVideoUsage();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
 
@@ -424,8 +426,7 @@ const GeneratePage = () => {
   const normalizedPlan = (plan || profile?.plan || "free").toLowerCase();
   const videoCreditsLimit =
     profile?.monthly_video_limit ?? (normalizedPlan.includes("pro") ? 999 : normalizedPlan.includes("creator") ? 20 : 2);
-  const videoCreditsUsed = 0;
-  const videoCreditsRemaining = Math.max(0, videoCreditsLimit - videoCreditsUsed);
+  const videoCreditsRemaining = Math.max(0, videoCreditsLimit - videoUsed);
 
   const canProceed = useCallback(() => {
     if (currentStep === 1) {
@@ -687,6 +688,10 @@ const GeneratePage = () => {
 
       if (videoError) throw videoError;
       if (videoData.error) {
+        if (videoData.error === "insufficient_credits") {
+          setShowCreditsModal(true);
+          throw new Error("insufficient_credits");
+        }
         if (videoData.error === "insufficient_spoken_content") {
           toast({
             title: "Insufficient Spoken Content",
@@ -748,6 +753,7 @@ const GeneratePage = () => {
       if (genData.credits?.used !== undefined) {
         updateCreditsAfterGeneration(genData.credits.used);
       }
+      await refreshVideoUsage();
 
       if (append) {
         setHasGeneratedAnother(true);
@@ -961,7 +967,7 @@ const GeneratePage = () => {
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
             <CreditsIndicator
               label={creationMode === "video_upload" ? "Video credits" : "Text credits"}
-              used={creationMode === "video_upload" ? videoCreditsUsed : undefined}
+              used={creationMode === "video_upload" ? videoUsed : undefined}
               limit={creationMode === "video_upload" ? videoCreditsLimit : undefined}
               remaining={creationMode === "video_upload" ? videoCreditsRemaining : undefined}
             />
@@ -1585,7 +1591,7 @@ const GeneratePage = () => {
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.3 }}
             >
-              <Card>
+              <Card className="relative">
                 <CardHeader className="space-y-2">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
@@ -1817,6 +1823,37 @@ const GeneratePage = () => {
                     </TabsContent>
                   </Tabs>
                 </CardContent>
+                {isProcessing && (
+                  <div className="absolute inset-0 z-10 rounded-lg bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="w-full max-w-md rounded-xl border bg-background/90 p-5 shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center"
+                        >
+                          <Sparkles className="h-4 w-4 text-primary" />
+                        </motion.div>
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">{activeStageLabel}</p>
+                          <p className="text-xs text-muted-foreground">Hang tight, we are preparing your content.</p>
+                        </div>
+                      </div>
+                      <div className="mt-4 space-y-3">
+                        <div className="flex items-center gap-3">
+                          <motion.div
+                            className="h-10 w-10 rounded-full border-2 border-primary/20 border-t-primary"
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          />
+                          <div className="text-xs text-muted-foreground">
+                            Please keep this tab open while we work.
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </Card>
 
 

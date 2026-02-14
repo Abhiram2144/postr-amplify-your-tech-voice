@@ -16,7 +16,7 @@ export const STRIPE_PLANS = {
     limits: {
       ideasPerMonth: 60,
       videosPerMonth: 20,
-      platforms: "all",
+      platforms: 5,
       projectsLimit: 10,
     },
   },

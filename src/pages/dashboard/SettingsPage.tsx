@@ -185,7 +185,7 @@ const MyPlanTabContent = ({ profile }: { profile: UserProfile | null }) => {
         "1 free rewrite",
         "Text and video input",
         "Advanced content analysis",
-        "Unlimited platform exports",
+        "5 platforms",
         "Fast processing",
         "Full project history",
       ],

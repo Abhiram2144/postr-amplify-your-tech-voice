@@ -98,6 +98,43 @@ serve(async (req) => {
     if (!user?.id) throw new Error("User not authenticated");
     logStep("User authenticated", { userId: user.id });
 
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0, 0, 0);
+
+    const { data: profile, error: profileError } = await supabaseClient
+      .from("users")
+      .select("monthly_video_limit")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError) throw new Error(`Failed to get user profile: ${profileError.message}`);
+
+    const monthlyVideoLimit = profile?.monthly_video_limit ?? 2;
+
+    const { count: videoUsageCount, error: usageError } = await supabaseClient
+      .from("usage_logs")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .in("action", ["generate_content_video_upload", "generate_content_video"])
+      .gte("created_at", monthStart.toISOString())
+      .lt("created_at", monthEnd.toISOString());
+
+    if (usageError) throw new Error(`Failed to check video usage: ${usageError.message}`);
+
+    if ((videoUsageCount ?? 0) >= monthlyVideoLimit) {
+      logStep("Video credit limit reached", { used: videoUsageCount, limit: monthlyVideoLimit });
+      return new Response(JSON.stringify({
+        error: "insufficient_credits",
+        message: "You've reached your monthly video limit. Upgrade your plan for more video credits.",
+        used: videoUsageCount,
+        limit: monthlyVideoLimit,
+      }), {
+        status: 402,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Validate request
     const body = await req.json();
     const validation = requestSchema.safeParse(body);

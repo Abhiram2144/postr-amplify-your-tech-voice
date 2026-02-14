@@ -18,6 +18,7 @@ import type { UserProfile } from "@/components/dashboard/DashboardLayout";
 import CheckoutSuccessModal from "@/components/dashboard/CheckoutSuccessModal";
 import { useProjects } from "@/hooks/useProjects";
 import { useCredits } from "@/hooks/useCredits";
+import { useVideoUsage } from "@/hooks/useVideoUsage";
 import { format } from "date-fns";
 
 interface DashboardContext {
@@ -47,6 +48,7 @@ const DashboardOverview = () => {
   const [showCheckoutSuccess, setShowCheckoutSuccess] = useState(false);
   const { projects, loading: projectsLoading } = useProjects();
   const { creditsUsed, creditsLimit, creditsRemaining, loading: creditsLoading } = useCredits();
+  const { videoUsed, loading: videoLoading } = useVideoUsage();
 
   // Check for checkout success param
   useEffect(() => {
@@ -83,7 +85,8 @@ const DashboardOverview = () => {
   const generationsPercent = effectiveTextLimit > 0 ? Math.min(100, Math.max(0, (effectiveTextRemaining / effectiveTextLimit) * 100)) : 0;
 
   const effectiveVideoLimit = typeof videosTotal === "number" ? videosTotal : (profile?.monthly_video_limit ?? 0);
-  const effectiveVideoRemaining = profile?.monthly_video_limit ?? effectiveVideoLimit;
+  const effectiveVideoUsed = videoLoading ? 0 : videoUsed;
+  const effectiveVideoRemaining = Math.max(0, effectiveVideoLimit - effectiveVideoUsed);
   const videosPercent = effectiveVideoLimit > 0 ? Math.min(100, Math.max(0, (effectiveVideoRemaining / effectiveVideoLimit) * 100)) : 0;
 
   const generationsRemainingLabel = generationsTotal === "unlimited" ? "Unlimited" : effectiveTextRemaining;
