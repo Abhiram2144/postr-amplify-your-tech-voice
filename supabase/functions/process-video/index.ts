@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+import { enforceRateLimit } from "../_shared/rate-limit.ts";
 
 // CORS configuration
 const ALLOWED_ORIGINS = [
@@ -97,6 +98,26 @@ serve(async (req) => {
     const user = userData.user;
     if (!user?.id) throw new Error("User not authenticated");
     logStep("User authenticated", { userId: user.id });
+
+    // Per-user burst rate limit to stop abuse of video processing (3 uploads per 10 minutes)
+    const rateLimit = await enforceRateLimit(supabaseClient, {
+      userId: user.id,
+      action: "process_video_upload",
+      limit: 3,
+      intervalSeconds: 600,
+    });
+
+    if (!rateLimit.allowed) {
+      logStep("Rate limit hit", { action: "process_video_upload", count: rateLimit.count });
+      return new Response(JSON.stringify({
+        error: "rate_limited",
+        message: "Too many video uploads. Please wait before trying again.",
+        retryAfter: rateLimit.retryAfterSeconds,
+      }), {
+        status: 429,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);

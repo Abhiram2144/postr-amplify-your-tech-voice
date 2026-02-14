@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+import { enforceRateLimit } from "../_shared/rate-limit.ts";
 
 // CORS configuration with origin restrictions
 const ALLOWED_ORIGINS = [
@@ -230,6 +231,26 @@ serve(async (req) => {
 
     const { mode, topic, audience, intent, tone, script_text, platforms, video_context, video_intent, upload_context, upload_intent, is_x_premium } = validation.data;
     logStep("Request validated", { mode, platformCount: platforms.length });
+
+    // Per-user burst rate limit to reduce abuse (10 generations per 5 minutes)
+    const rateLimit = await enforceRateLimit(supabaseClient, {
+      userId: user.id,
+      action: `generate_content_${mode}`,
+      limit: 10,
+      intervalSeconds: 300,
+    });
+
+    if (!rateLimit.allowed) {
+      logStep("Rate limit hit", { action: `generate_content_${mode}`, count: rateLimit.count });
+      return new Response(JSON.stringify({
+        error: "rate_limited",
+        message: "Too many requests. Please wait a moment before generating again.",
+        retryAfter: rateLimit.retryAfterSeconds,
+      }), {
+        status: 429,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Get user plan and usage
     const { data: userProfile, error: profileError } = await supabaseClient
