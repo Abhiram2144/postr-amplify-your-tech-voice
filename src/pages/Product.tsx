@@ -1,9 +1,9 @@
 import Header from "@/components/landing/Header";
 import Footer from "@/components/landing/Footer";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Play, Pause, FileText, ChevronDown, Sparkles, Zap, Video, PenTool, Globe, CheckCircle2, RotateCcw, Volume2, VolumeX, Maximize } from "lucide-react";
+import { ArrowRight, Play, Pause, Sparkles, Zap, Video, PenTool, CheckCircle2, Volume2, VolumeX, Maximize } from "lucide-react";
 import { Link } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useState, useRef } from "react";
 
 /* ─── Video Demo Data ─── */
@@ -18,13 +18,7 @@ const videoDemos = [
     icon: Zap,
     gradient: "from-primary/20 via-primary/5 to-transparent",
     accentColor: "primary",
-    videoSrc: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-    transcript: `[0:00] Start by typing a brief topic — for example, "Why developers should blog."
-[0:05] Postr instantly analyzes your input for structure, clarity, and hook potential.
-[0:12] The AI scores your idea and suggests improvements to maximize engagement.
-[0:18] Choose your target platforms — LinkedIn, X, Threads, or Reddit.
-[0:24] Platform-native posts are generated, each with the right tone, length, and formatting.
-[0:30] Copy, edit, or regenerate any output until it's perfect.`,
+    videoSrc: "/media/postr-topic.mp4",
     highlights: ["Instant analysis", "Smart scoring", "Multi-platform output"],
   },
   {
@@ -37,13 +31,7 @@ const videoDemos = [
     icon: PenTool,
     gradient: "from-accent/20 via-accent/5 to-transparent",
     accentColor: "accent",
-    videoSrc: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-    transcript: `[0:00] Paste your full script or article draft into the editor.
-[0:06] Postr identifies key arguments, insights, and quotable moments.
-[0:12] The AI preserves your voice while restructuring for each platform's format.
-[0:18] LinkedIn gets a professional narrative; X gets punchy threads; Reddit gets detailed breakdowns.
-[0:25] Each output includes hooks, CTAs, and formatting optimized for that platform.
-[0:32] Iterate on any individual post without affecting the others.`,
+    videoSrc: "/media/postr-script.mp4",
     highlights: ["Voice preservation", "Key insight extraction", "Format adaptation"],
   },
   {
@@ -56,13 +44,7 @@ const videoDemos = [
     icon: Video,
     gradient: "from-primary/15 via-accent/10 to-transparent",
     accentColor: "primary",
-    videoSrc: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-    transcript: `[0:00] Paste a YouTube link or raw video transcript.
-[0:05] Postr processes the video, extracting key topics and timestamps.
-[0:12] The AI identifies the most shareable and engaging moments.
-[0:18] Written posts are generated that capture the video's value in text form.
-[0:24] Thread-style breakdowns, discussion openers, and key-takeaway posts are created.
-[0:30] Perfect for repurposing podcast episodes, tutorials, and conference talks.`,
+    videoSrc: "/media/postr-video.mp4",
     highlights: ["Auto-extraction", "Timestamp mapping", "Repurposing engine"],
   },
 ];
@@ -237,10 +219,6 @@ const VideoDemoSection = ({
   index: number;
   isReversed: boolean;
 }) => {
-  const [showTranscript, setShowTranscript] = useState(false);
-  // Remove component-level playing state as the VideoPlayer component handles it internally
-
-
   return (
     <motion.section
       initial={{ opacity: 0 }}
@@ -269,48 +247,6 @@ const VideoDemoSection = ({
           <div className="group relative overflow-hidden rounded-2xl border border-border bg-card shadow-lg">
             <VideoPlayer src={demo.videoSrc} />
           </div>
-
-          {/* Transcript Toggle */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.4 }}
-            className="mt-4"
-          >
-            <button
-              onClick={() => setShowTranscript(!showTranscript)}
-              className="group/btn flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-muted-foreground transition-all hover:border-primary/30 hover:text-foreground w-full"
-            >
-              <FileText className="h-4 w-4 text-primary" />
-              <span>View Transcript</span>
-              <motion.div
-                animate={{ rotate: showTranscript ? 180 : 0 }}
-                transition={{ duration: 0.2 }}
-                className="ml-auto"
-              >
-                <ChevronDown className="h-4 w-4" />
-              </motion.div>
-            </button>
-
-            <AnimatePresence>
-              {showTranscript && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.3, ease: "easeInOut" }}
-                  className="overflow-hidden"
-                >
-                  <div className="mt-2 rounded-xl border border-border bg-card p-5">
-                    <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed text-muted-foreground">
-                      {demo.transcript}
-                    </pre>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
         </motion.div>
 
         {/* Content Area */}
