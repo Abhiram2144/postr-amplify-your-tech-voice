@@ -4,33 +4,33 @@ import { Check, X } from "lucide-react";
 
 const comparisonData = {
   features: [
-    "Transcription",
+    "Multi-Input Modes (Topic / Script / Video)",
+    "Platform-Specific Post Generation",
     "Structured Content Scoring",
     "Narrative Improvement / Advice",
-    "Platform-Specific Post Generation",
     "Audience-First Optimization",
     "Built for Thought Leadership",
   ],
   competitors: [
     {
       name: "Castmagic",
-      values: ["yes", "no", "no", "basic", "no", "no"],
+      values: ["audio-only", "basic", "no", "no", "no", "no"],
     },
     {
       name: "Repurpose.io",
-      values: ["no", "no", "no", "no", "no", "no"],
+      values: ["video-first", "limited", "no", "no", "no", "no"],
     },
     {
       name: "Quso.ai",
-      values: ["yes", "no", "no", "visual", "no", "no"],
+      values: ["video-first", "visual", "no", "no", "no", "no"],
     },
     {
       name: "Predis.ai",
-      values: ["no", "no", "no", "generic", "no", "no"],
+      values: ["text-first", "generic", "no", "limited", "no", "no"],
     },
     {
       name: "Typical Social Tools",
-      values: ["no", "limited", "no", "limited", "no", "no"],
+      values: ["text-only", "limited", "no", "no", "no", "no"],
     },
   ],
 };
