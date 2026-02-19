@@ -337,8 +337,9 @@ Respond ONLY with valid JSON in this exact format:
       },
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
+        max_tokens: 500, // Intent inference is structured JSON — cap output
         messages: [
-          { role: "system", content: "You are an expert content analyst. Analyze content to understand creator intent. Be precise." },
+          { role: "system", content: "Expert content analyst. Infer creator intent precisely. Return only JSON." },
           { role: "user", content: intentPrompt },
         ],
       }),

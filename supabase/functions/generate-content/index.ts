@@ -161,6 +161,15 @@ const generateContentSchema = z.object({
   { message: "Required fields missing for the selected mode" }
 );
 
+// Truncate transcripts to cap input tokens (~750 tokens per 3000 chars)
+const MAX_TRANSCRIPT_CHARS = 3000;
+function truncateTranscript(text: string): string {
+  if (text.length <= MAX_TRANSCRIPT_CHARS) return text;
+  const truncated = text.substring(0, MAX_TRANSCRIPT_CHARS);
+  const lastSentence = truncated.lastIndexOf('. ');
+  return (lastSentence > MAX_TRANSCRIPT_CHARS * 0.7 ? truncated.substring(0, lastSentence + 1) : truncated) + "\n[transcript truncated for efficiency]";
+}
+
 // Platform-specific formatting instructions
 const PLATFORM_INSTRUCTIONS: Record<string, string> = {
   linkedin: "Format for LinkedIn: Professional tone, use line breaks for readability, start with a hook, include relevant emojis sparingly, end with a question or call-to-action. Optimal length: 1200-1500 characters.",
@@ -409,7 +418,7 @@ Duration: ${video_context.video_length_seconds} seconds
 Views: ${video_context.view_count.toLocaleString()}
 
 === FULL TRANSCRIPT ===
-${video_context.transcript}
+${truncateTranscript(video_context.transcript)}
 
 === INFERRED CREATOR INTENT ===
 Primary Intent: ${video_intent.intent}
@@ -444,7 +453,7 @@ Duration: ${upload_context.duration_seconds} seconds
 Word Count: ${upload_context.word_count} words
 
 === FULL TRANSCRIPT ===
-${upload_context.transcript}
+${truncateTranscript(upload_context.transcript)}
 
 === INFERRED CREATOR INTENT ===
 Primary Intent: ${upload_intent.intent}
@@ -495,32 +504,18 @@ Your tasks:
       })
       .join("\n\n");
 
-    // Full system prompt - differentiated by plan
+    // Full system prompt - differentiated by plan (compressed for token efficiency)
     const systemPromptByPlan: Record<string, string> = {
-      free: `You are a helpful junior content creator.
+      free: `Junior content creator. Write clearly, naturally, like a real person. Avoid buzzwords, hype, jargon. Simple, honest, straightforward. Don't over-optimize or sound like a coach.`,
+      creator: `Experienced content creator. Write with intention, not hype. Care about structure, flow, readability. Know platform norms naturally. Crafted but not artificial. Confident, not loud.`,
+      pro: `Senior content strategist. Write with intent and restraint. Strong opinions implied, not spelled out. Think audience psychology, retention, attention. Confident, insightful, sharp, deliberate. Nothing generic or safe.`,
+    };
 
-    You write clearly and naturally, like a real person explaining something they understand.
-    You avoid buzzwords, hype language, and marketing jargon.
-    Your writing should feel simple, honest, and straightforward, never polished to perfection.
-
-    Do not over-optimize.
-    Do not sound like a coach, strategist, or expert.
-    If something is obvious, say it simply and move on.`,
-      creator: `You are an experienced content creator who understands what works because you have posted consistently.
-
-    You write with intention, not hype.
-    You care about structure, flow, and readability.
-    You know platform norms and follow them naturally without explaining them.
-
-    Your writing should feel crafted, but not polished to the point of sounding artificial.
-    You are confident, not loud.`,
-      pro: `You are a senior content strategist who writes with intent and restraint.
-
-    You have strong opinions and you are comfortable implying them without spelling everything out.
-    You think in terms of audience psychology, retention, and attention, but you never explain this explicitly.
-
-    Your writing should feel confident but not promotional, insightful without sounding instructional, sharp, slightly opinionated, and deliberate.
-    Nothing you write should feel generic or safe. If a sentence does not add leverage, remove it.`,
+    // Plan-tiered max_tokens to prevent runaway output costs
+    const maxTokensByPlan: Record<string, number> = {
+      free: 1500,
+      creator: 2500,
+      pro: 4000,
     };
 
     const fullPrompt = `${contentPrompt}
@@ -560,6 +555,7 @@ Return ONLY valid JSON, no markdown code blocks or additional text.`;
       },
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
+        max_tokens: maxTokensByPlan[planTier],
         messages: [
           { role: "system", content: systemPromptByPlan[planTier] },
           { role: "user", content: fullPrompt },
