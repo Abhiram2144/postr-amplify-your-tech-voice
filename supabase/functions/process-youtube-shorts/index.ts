@@ -285,7 +285,7 @@ serve(async (req) => {
         audio_url: audioUrl,
         punctuate: true,
         format_text: true,
-        speaker_labels: true,
+        // speaker_labels removed — not used downstream, saves ~10% AssemblyAI cost
       }),
     });
 
@@ -400,10 +400,11 @@ Respond ONLY with valid JSON in this exact format:
       },
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
+        max_tokens: 500, // Intent inference is structured JSON — cap output
         messages: [
           { 
             role: "system", 
-            content: "You are an expert content analyst. Analyze content to understand creator intent, not to rewrite it. Be precise and insightful." 
+            content: "Expert content analyst. Infer creator intent precisely. Return only JSON." 
           },
           { role: "user", content: intentPrompt },
         ],
