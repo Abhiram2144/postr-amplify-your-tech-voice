@@ -3,13 +3,13 @@ export const STRIPE_PLANS = {
   creator: {
     name: "Creator",
     monthly: {
-      priceId: "price_1SwoC8H0ScE1y6GM38RcxUcw",
-      productId: "prod_TudTvHmO8aHfbk",
+      priceId: "price_1T5prxBQwmCYtfWQfR9Lg29Z",
+      productId: "prod_U3xnQlT6Gdm0Rt",
       price: 14,
     },
     yearly: {
-      priceId: "price_1SwoCPH0ScE1y6GMe5hmuwXU",
-      productId: "prod_TudTM34FQe9Vi4",
+      priceId: "price_1T5psOBQwmCYtfWQfbtELLOq",
+      productId: "prod_U3xo7ERFEWBd2J",
       price: 134.40, // 20% off ($14 * 12 * 0.8)
       monthlyEquivalent: 11.20,
     },
@@ -23,13 +23,13 @@ export const STRIPE_PLANS = {
   pro: {
     name: "Pro",
     monthly: {
-      priceId: "price_1SwoCXH0ScE1y6GMgQlfMFgr",
-      productId: "prod_TudTiux1EV47Av",
+      priceId: "", // TODO: create Pro Monthly price in Stripe dashboard
+      productId: "",
       price: 29,
     },
     yearly: {
-      priceId: "price_1SwoCYH0ScE1y6GMbM9UqdfM",
-      productId: "prod_TudTx04tgVMQig",
+      priceId: "", // TODO: create Pro Yearly price in Stripe dashboard
+      productId: "",
       price: 278.40, // 20% off ($29 * 12 * 0.8)
       monthlyEquivalent: 23.20,
     },
