@@ -15,7 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
 // Use publishable key from environment - MUST match Stripe secret key environment (test/live)
-const stripePromise = loadStripe("pk_live_51SwnpfH0ScE1y6GMNPp8yXfG8b69BHyX8KAbJsifnZA0v8eBrFpTmfADWNi7iNLyZQDSglNWJAjAdlQZ5VGxCKGP00hG9PZzRi");
+const stripePromise = loadStripe("pk_test_51T567uBQwmCYtfWQswOb4tWTk6D0MgOUpgllGK0YFK9gbLhE7u3iFTMggI8AGa8Q7xQnKtXa6ihmsoqeTRHM3CJe00vWOzCobl");
 
 interface EmbeddedCheckoutModalProps {
   open: boolean;
