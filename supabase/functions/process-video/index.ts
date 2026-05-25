@@ -181,8 +181,10 @@ serve(async (req) => {
     // Get API keys
     const ASSEMBLYAI_API_KEY = Deno.env.get("ASSEMBLYAI_API_KEY");
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!ASSEMBLYAI_API_KEY) throw new Error("ASSEMBLYAI_API_KEY is not configured");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    // Backwards-compat: support either LOVABLE_API_KEY or OPENAI_API_KEY
+    if (!LOVABLE_API_KEY && !OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
 
     // Step 1: Generate signed URL for the uploaded video
     logStep("Generating signed URL");
@@ -329,15 +331,19 @@ Respond ONLY with valid JSON in this exact format:
   "inference_confidence": 0.85
 }`;
 
-    const intentResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    // Prefer OPENAI_API_KEY; fall back to LOVABLE_API_KEY if present
+    const aiKeyForRequest = OPENAI_API_KEY ?? LOVABLE_API_KEY;
+    const aiEndpoint = OPENAI_API_KEY ? "https://api.openai.com/v1/chat/completions" : "https://ai.gateway.lovable.dev/v1/chat/completions";
+
+    const intentResponse = await fetch(aiEndpoint, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+        "Authorization": `Bearer ${aiKeyForRequest}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        max_tokens: 500, // Intent inference is structured JSON — cap output
+        model: OPENAI_API_KEY ? "gpt-4o-mini" : "google/gemini-3-flash-preview",
+        max_tokens: 500,
         messages: [
           { role: "system", content: "Expert content analyst. Infer creator intent precisely. Return only JSON." },
           { role: "user", content: intentPrompt },
