@@ -73,7 +73,9 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     });
 
     if (error) throw error;
-    if (data?.url) {
+    if (data?.checkoutUrl) {
+      window.open(data.checkoutUrl, "_blank");
+    } else if (data?.url) {
       window.open(data.url, "_blank");
     }
   };
@@ -93,13 +95,15 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
 
     if (error) throw error;
     
-    if (data?.clientSecret) {
-      return data.clientSecret;
+    if (data?.checkoutUrl) {
+      window.location.href = data.checkoutUrl;
+      return data.checkoutUrl;
     }
     
-    // Fallback to redirect if embedded not supported
+    // Fallback to redirect if checkout URL is returned under the legacy field name
     if (data?.url) {
       window.location.href = data.url;
+      return data.url;
     }
     
     return null;

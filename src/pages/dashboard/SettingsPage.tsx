@@ -176,7 +176,7 @@ const MyPlanTabContent = ({ profile }: { profile: UserProfile | null }) => {
     {
       id: "creator" as PlanType,
       name: STRIPE_PLANS.creator.name,
-      price: "$14",
+      price: `$${STRIPE_PLANS.creator.monthly.price}`,
       period: "/month",
       features: [
         "60 ideas per month",
@@ -195,7 +195,7 @@ const MyPlanTabContent = ({ profile }: { profile: UserProfile | null }) => {
     {
       id: "pro" as PlanType,
       name: STRIPE_PLANS.pro.name,
-      price: "$29",
+      price: `$${STRIPE_PLANS.pro.monthly.price}`,
       period: "/month",
       features: [
         "150 ideas per month",

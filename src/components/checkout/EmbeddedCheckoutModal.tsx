@@ -1,9 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { loadStripe } from "@stripe/stripe-js";
-import {
-  EmbeddedCheckoutProvider,
-  EmbeddedCheckout,
-} from "@stripe/react-stripe-js";
+import { useState, useEffect, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -13,9 +8,6 @@ import {
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-
-// Use publishable key from environment - MUST match Stripe secret key environment (test/live)
-const stripePromise = loadStripe("pk_test_51T567uBQwmCYtfWQswOb4tWTk6D0MgOUpgllGK0YFK9gbLhE7u3iFTMggI8AGa8Q7xQnKtXa6ihmsoqeTRHM3CJe00vWOzCobl");
 
 interface EmbeddedCheckoutModalProps {
   open: boolean;
@@ -31,7 +23,7 @@ export const EmbeddedCheckoutModal = ({
   onSuccess,
 }: EmbeddedCheckoutModalProps) => {
   const { session } = useAuth();
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -45,7 +37,7 @@ export const EmbeddedCheckoutModal = ({
       const { data, error: fnError } = await supabase.functions.invoke(
         "create-checkout",
         {
-          body: { priceId, embedded: true },
+          body: { priceId, embedded: false },
           headers: {
             Authorization: `Bearer ${session.access_token}`,
           },
@@ -55,10 +47,11 @@ export const EmbeddedCheckoutModal = ({
       if (fnError) throw fnError;
       if (data?.error) throw new Error(data.error);
 
-      if (data?.clientSecret) {
-        setClientSecret(data.clientSecret);
+      if (data?.checkoutUrl) {
+        setCheckoutUrl(data.checkoutUrl);
+        window.location.href = data.checkoutUrl;
       } else if (data?.url) {
-        // Fallback to redirect if embedded not supported
+        setCheckoutUrl(data.url);
         window.location.href = data.url;
       }
     } catch (err) {
@@ -73,32 +66,16 @@ export const EmbeddedCheckoutModal = ({
     if (open && priceId) {
       fetchClientSecret();
     } else {
-      setClientSecret(null);
+      setCheckoutUrl(null);
       setError(null);
     }
   }, [open, priceId, fetchClientSecret]);
-
-  // Handle completion - close modal and trigger success callback
-  const handleComplete = useCallback(() => {
-    onOpenChange(false);
-    onSuccess?.();
-  }, [onOpenChange, onSuccess]);
-
-  // IMPORTANT: Memoize options to prevent React warning about prop changes
-  // EmbeddedCheckoutProvider requires stable options reference
-  const checkoutOptions = useMemo(() => {
-    if (!clientSecret) return null;
-    return {
-      clientSecret,
-      onComplete: handleComplete,
-    };
-  }, [clientSecret, handleComplete]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0">
         <DialogHeader className="p-6 pb-0">
-          <DialogTitle>Complete your subscription</DialogTitle>
+          <DialogTitle>Redirecting to secure checkout</DialogTitle>
         </DialogHeader>
         <div className="p-6 pt-4">
           {loading && (
@@ -113,13 +90,10 @@ export const EmbeddedCheckoutModal = ({
             </div>
           )}
 
-          {checkoutOptions && !loading && (
-            <EmbeddedCheckoutProvider
-              stripe={stripePromise}
-              options={checkoutOptions}
-            >
-              <EmbeddedCheckout className="min-h-[400px]" />
-            </EmbeddedCheckoutProvider>
+          {!loading && !error && checkoutUrl && (
+            <p className="text-sm text-muted-foreground">
+              You will be redirected to Dodo Payments to complete your subscription.
+            </p>
           )}
         </div>
       </DialogContent>

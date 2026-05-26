@@ -120,8 +120,8 @@ function calculateCredits(task: Task): number {
 | Plan | Credits | Cost to Serve | Revenue | Margin |
 |------|---------|---------------|---------|--------|
 | Free | 10 | $0.20 | $0 | -$0.20 (acquisition cost) |
-| Creator ($14/mo) | 60 | $1.20 | $14 | 91% |
-| Pro ($29/mo) | 150 | $3.00 | $29 | 90% |
+| Creator ($8/mo) | 60 | $1.20 | $8 | 85% |
+| Pro ($15/mo) | 150 | $3.00 | $15 | 80% |
 
 ---
 

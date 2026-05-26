@@ -183,7 +183,6 @@ serve(async (req) => {
     // Get API keys
     const YOUTUBE_API_KEY = Deno.env.get("YOUTUBE_API_KEY");
     const ASSEMBLYAI_API_KEY = Deno.env.get("ASSEMBLYAI_API_KEY");
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
     if (!YOUTUBE_API_KEY) {
@@ -192,7 +191,7 @@ serve(async (req) => {
     if (!ASSEMBLYAI_API_KEY) {
       throw new Error("ASSEMBLYAI_API_KEY is not configured");
     }
-    if (!LOVABLE_API_KEY && !OPENAI_API_KEY) {
+    if (!OPENAI_API_KEY) {
       throw new Error("OPENAI_API_KEY is not configured");
     }
 
@@ -393,8 +392,8 @@ Respond ONLY with valid JSON in this exact format:
   "key_takeaways": ["takeaway 1", "takeaway 2", "takeaway 3"]
 }`;
 
-    const aiKeyForRequest = OPENAI_API_KEY ?? LOVABLE_API_KEY;
-    const aiEndpoint = OPENAI_API_KEY ? "https://api.openai.com/v1/chat/completions" : "https://ai.gateway.lovable.dev/v1/chat/completions";
+    const aiKeyForRequest = OPENAI_API_KEY;
+    const aiEndpoint = "https://api.openai.com/v1/chat/completions";
 
     const intentResponse = await fetch(aiEndpoint, {
       method: "POST",
@@ -403,7 +402,7 @@ Respond ONLY with valid JSON in this exact format:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: OPENAI_API_KEY ? "gpt-4o-mini" : "google/gemini-3-flash-preview",
+        model: "gpt-4o-mini",
         max_tokens: 500,
         messages: [
           { 

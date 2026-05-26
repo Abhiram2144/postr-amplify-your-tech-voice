@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Sparkles, Zap, Crown, X, TrendingUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { STRIPE_PLANS } from "@/lib/stripe-config";
 
 interface InsufficientCreditsModalProps {
   open: boolean;
@@ -17,14 +18,14 @@ const planUpgrades = {
     {
       name: "Creator",
       credits: "100 generations/month",
-      price: "$14",
+      price: `$${STRIPE_PLANS.creator.monthly.price}`,
       icon: Sparkles,
       gradient: "from-primary to-accent",
     },
     {
       name: "Pro",
       credits: "Unlimited generations",
-      price: "$29",
+      price: `$${STRIPE_PLANS.pro.monthly.price}`,
       icon: Crown,
       gradient: "from-accent to-primary",
       highlight: true,
@@ -34,7 +35,7 @@ const planUpgrades = {
     {
       name: "Pro",
       credits: "Unlimited generations",
-      price: "$29",
+      price: `$${STRIPE_PLANS.pro.monthly.price}`,
       icon: Crown,
       gradient: "from-accent to-primary",
       highlight: true,

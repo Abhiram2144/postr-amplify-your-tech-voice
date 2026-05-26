@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import Stripe from "https://esm.sh/stripe@18.5.0";
+import { getDodoClient, getDisplayName } from "../_shared/billing.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
 // CORS configuration with origin restrictions
@@ -53,13 +53,13 @@ const getSafeErrorMessage = (error: unknown): string => {
         msg.includes("authorization") || msg.includes("no authorization header")) {
       return "Authentication required. Please log in again.";
     }
-    if (msg.includes("stripe") || msg.includes("customer") || msg.includes("portal")) {
+    if (msg.includes("dodo") || msg.includes("customer") || msg.includes("portal")) {
       return "Billing portal error. Please try again or contact support.";
     }
     if (msg.includes("not set") || msg.includes("not configured")) {
       return "Service temporarily unavailable. Please try again later.";
     }
-    if (msg.includes("no stripe customer")) {
+    if (msg.includes("no dodo customer")) {
       return "No billing account found. Please subscribe to a plan first.";
     }
   }
@@ -77,8 +77,7 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
-    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    if (!stripeKey) throw new Error("STRIPE_SECRET_KEY is not set");
+    const dodo = getDodoClient();
 
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -96,26 +95,43 @@ serve(async (req) => {
     if (!user?.email) throw new Error("User not authenticated or email not available");
     logStep("User authenticated", { userId: user.id });
 
-    const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
-    if (customers.data.length === 0) {
-      throw new Error("No Stripe customer found for this user");
+    const { data: billingRecord } = await supabaseClient
+       .from("user_stripe_data")
+       .select("stripe_customer_id")
+       .eq("user_id", user.id)
+       .maybeSingle();
+
+    let customerId = billingRecord?.stripe_customer_id ?? null;
+
+    if (!customerId) {
+      const customerPage = await dodo.customers.list({ email: user.email });
+      customerId = customerPage.items?.[0]?.customer_id ?? null;
     }
-    const customerId = customers.data[0].id;
-    logStep("Found Stripe customer");
+
+    if (!customerId) {
+      const createdCustomer = await dodo.customers.create({
+        email: user.email,
+        name: getDisplayName(user.email, user.user_metadata?.full_name ?? user.user_metadata?.name ?? null),
+      });
+      customerId = createdCustomer.customer_id;
+    }
+
+    if (!customerId) {
+      throw new Error("No Dodo customer found for this user");
+    }
+    logStep("Found Dodo customer", { customerId });
 
     // Use validated origin or fallback
     const returnOrigin = origin && ALLOWED_ORIGINS.includes(origin) 
       ? origin 
       : ALLOWED_ORIGINS[0];
       
-    const portalSession = await stripe.billingPortal.sessions.create({
-      customer: customerId,
+    const portalSession = await dodo.customers.customerPortal.create(customerId, {
       return_url: `${returnOrigin}/dashboard/settings`,
     });
     logStep("Customer portal session created");
 
-    return new Response(JSON.stringify({ url: portalSession.url }), {
+    return new Response(JSON.stringify({ url: portalSession.link }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });

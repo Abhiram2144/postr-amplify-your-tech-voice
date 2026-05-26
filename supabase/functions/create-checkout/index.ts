@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+import { getDodoClient, getDisplayName } from "../_shared/billing.ts";
 
 // CORS configuration with origin restrictions
 const ALLOWED_ORIGINS = [
@@ -37,7 +37,7 @@ const checkoutSchema = z.object({
   priceId: z.string()
     .min(1, "Price ID is required")
     .max(100, "Price ID too long")
-    .regex(/^price_[a-zA-Z0-9_]+$/, "Invalid price ID format"),
+    .regex(/^(price|pdt)_[a-zA-Z0-9_]+$/, "Invalid plan ID format"),
   billingCycle: z.enum(["monthly", "yearly"]).optional(),
   embedded: z.boolean().optional(),
 });
@@ -86,11 +86,12 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const supabaseClient = createClient(
+    const supabaseClient = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     { auth: { persistSession: false } }
   );
+    const dodo = getDodoClient();
 
   try {
     logStep("Function started");
@@ -119,61 +120,34 @@ serve(async (req) => {
     if (!user?.email) throw new Error("User not authenticated or email not available");
     logStep("User authenticated", { userId: user.id });
 
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-      apiVersion: "2025-08-27.basil",
-    });
-
-    // Check for existing customer
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
-    let customerId;
-    if (customers.data.length > 0) {
-      customerId = customers.data[0].id;
-      logStep("Found existing customer");
-    }
-
     // Use validated origin or fallback
     const returnOrigin = origin && ALLOWED_ORIGINS.includes(origin) 
       ? origin 
       : ALLOWED_ORIGINS[0];
-    
-    // Create session with embedded mode support
-    const sessionConfig: Stripe.Checkout.SessionCreateParams = {
-      customer: customerId,
-      customer_email: customerId ? undefined : user.email,
-      line_items: [
+
+    const checkoutSession = await dodo.checkoutSessions.create({
+      product_cart: [
         {
-          price: priceId,
+          product_id: priceId,
           quantity: 1,
         },
       ],
-      mode: "subscription",
-      metadata: {
-        user_id: user.id,
+      customer: {
+        email: user.email,
+        name: getDisplayName(user.email, user.user_metadata?.full_name ?? user.user_metadata?.name ?? null),
       },
-    };
+      return_url: `${returnOrigin}/dashboard?checkout=success`,
+      cancel_url: `${returnOrigin}/pricing?checkout=canceled`,
+      short_link: true,
+      confirm: false,
+    });
 
-    // For embedded checkout, use ui_mode and return_url
-    if (embedded) {
-      sessionConfig.ui_mode = "embedded";
-      sessionConfig.return_url = `${returnOrigin}/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}`;
-    } else {
-      sessionConfig.success_url = `${returnOrigin}/dashboard?checkout=success`;
-      sessionConfig.cancel_url = `${returnOrigin}/pricing?checkout=canceled`;
-    }
+    logStep("Checkout session created", { sessionId: checkoutSession.session_id, embedded });
 
-    const session = await stripe.checkout.sessions.create(sessionConfig);
-
-    logStep("Checkout session created", { sessionId: session.id, embedded });
-
-    // Return client_secret for embedded mode, url for redirect mode
-    if (embedded && session.client_secret) {
-      return new Response(JSON.stringify({ clientSecret: session.client_secret }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
-    }
-
-    return new Response(JSON.stringify({ url: session.url }), {
+    return new Response(JSON.stringify({
+      checkoutUrl: checkoutSession.checkout_url,
+      sessionId: checkoutSession.session_id,
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
