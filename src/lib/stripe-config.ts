@@ -14,7 +14,7 @@ export const STRIPE_PLANS = {
       priceId: DODO_CREATOR_PRODUCT_ID,
       productId: DODO_CREATOR_PRODUCT_ID,
       price: 76.80, // 20% off ($8 * 12 * 0.8)
-      monthlyEquivalent: 11.20,
+      monthlyEquivalent: 6.40,
     },
     limits: {
       ideasPerMonth: 60,
@@ -34,7 +34,7 @@ export const STRIPE_PLANS = {
       priceId: DODO_PRO_PRODUCT_ID,
       productId: DODO_PRO_PRODUCT_ID,
       price: 144, // 20% off ($15 * 12 * 0.8)
-      monthlyEquivalent: 23.20,
+      monthlyEquivalent: 12,
     },
     limits: {
       ideasPerMonth: 150,
