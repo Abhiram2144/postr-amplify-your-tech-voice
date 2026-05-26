@@ -31,6 +31,8 @@ interface User {
   created_at: string | null;
   monthly_generation_limit: number | null;
   generations_used_this_month: number | null;
+  plan_expires_at: string | null;
+  subscription_status: string | null;
 }
 
 const containerVariants = {
@@ -56,7 +58,7 @@ const AdminUsers = () => {
     try {
       const { data, error } = await supabase
         .from("users")
-        .select("id, email, full_name, plan, status, created_at, monthly_generation_limit, generations_used_this_month")
+        .select("id, email, full_name, plan, status, created_at, monthly_generation_limit, generations_used_this_month, plan_expires_at, subscription_status")
         .order("created_at", { ascending: false })
         .limit(100);
 
@@ -78,6 +80,20 @@ const AdminUsers = () => {
     fetchUsers();
   }, []);
 
+  // Real-time updates: refresh when any user row changes (webhooks, user self-service, etc.)
+  useEffect(() => {
+    const channel = supabase
+      .channel("admin-users-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "users" },
+        () => { fetchUsers(); },
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const updateUserStatus = async (userId: string, status: string) => {
     try {
       const { error } = await supabase
@@ -86,7 +102,7 @@ const AdminUsers = () => {
         .eq("id", userId);
 
       if (error) throw error;
-      
+
       toast({
         title: "Success",
         description: `User ${status === "suspended" ? "suspended" : "activated"}`,
@@ -103,23 +119,61 @@ const AdminUsers = () => {
   };
 
   const updateUserPlan = async (userId: string, plan: string) => {
-    const limits = plan === "pro" 
-      ? { monthly_generation_limit: 150, monthly_video_limit: 999 }
-      : plan === "creator"
-      ? { monthly_generation_limit: 60, monthly_video_limit: 20 }
-      : { monthly_generation_limit: 10, monthly_video_limit: 2 };
-
     try {
-      const { error } = await supabase
-        .from("users")
-        .update({ plan, ...limits })
-        .eq("id", userId);
+      if (plan === "free") {
+        // Best-effort: cancel the Dodo subscription so the user isn't charged again
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData.session?.access_token;
+        if (accessToken) {
+          try {
+            await supabase.functions.invoke("admin-update-subscription", {
+              body: { userId, action: "cancel" },
+              headers: { Authorization: `Bearer ${accessToken}` },
+            });
+          } catch {
+            // User may have no Dodo subscription — proceed with DB downgrade anyway
+          }
+        }
 
-      if (error) throw error;
-      
+        // Immediately downgrade in DB and set override so check-subscription
+        // won't re-sync the old Dodo subscription back to a paid plan.
+        const { error } = await supabase
+          .from("users")
+          .update({
+            plan: "free",
+            monthly_generation_limit: 10,
+            monthly_video_limit: 2,
+            plan_expires_at: null,
+            subscription_status: "free",
+            plan_override_by_admin: true,
+          })
+          .eq("id", userId);
+
+        if (error) throw error;
+      } else {
+        // Admin grant of a paid plan — set override so check-subscription
+        // respects this until a real Dodo webhook clears it.
+        const limits = plan === "pro"
+          ? { monthly_generation_limit: 150, monthly_video_limit: 999 }
+          : { monthly_generation_limit: 60, monthly_video_limit: 20 };
+
+        const { error } = await supabase
+          .from("users")
+          .update({
+            plan,
+            ...limits,
+            plan_expires_at: null,
+            subscription_status: "active",
+            plan_override_by_admin: true,
+          })
+          .eq("id", userId);
+
+        if (error) throw error;
+      }
+
       toast({
         title: "Success",
-        description: `User upgraded to ${plan}`,
+        description: `User plan updated to ${plan}`,
       });
       fetchUsers();
     } catch (error) {
@@ -132,15 +186,74 @@ const AdminUsers = () => {
     }
   };
 
+  const updateSubscriptionStatus = async (userId: string, nextStatus: "active" | "cancelled") => {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+
+      if (!accessToken) {
+        throw new Error("Must be logged in");
+      }
+
+      const { data, error } = await supabase.functions.invoke("admin-update-subscription", {
+        body: {
+          userId,
+          action: nextStatus === "cancelled" ? "cancel" : "restore",
+        },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast({
+        title: "Success",
+        description: `Subscription marked ${nextStatus}`,
+      });
+      fetchUsers();
+    } catch (error) {
+      console.error("Error updating subscription status:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update subscription status",
+        variant: "destructive",
+      });
+    }
+  };
+
   const filteredUsers = users.filter(user =>
     user.email.toLowerCase().includes(search.toLowerCase()) ||
     (user.full_name?.toLowerCase().includes(search.toLowerCase()))
   );
 
   const getPlanBadgeVariant = (plan: string | null) => {
-    switch (plan) {
+    switch ((plan ?? "").toLowerCase()) {
       case "pro": return "default";
       case "creator": return "secondary";
+      default: return "outline";
+    }
+  };
+
+  const getSubscriptionStatus = (user: User): string => {
+    // Use the DB subscription_status column which is kept accurate by webhooks
+    // and set explicitly when admin or user makes changes.
+    if (user.subscription_status) return user.subscription_status;
+    // Fallback for rows before the migration
+    const planLower = (user.plan ?? "free").toLowerCase();
+    return planLower === "free" ? "free" : "active";
+  };
+
+  const getSubscriptionBadgeVariant = (status: string) => {
+    switch (status) {
+      case "active": return "default";
+      case "cancelling": return "secondary";
+      case "on_hold": return "secondary";
+      case "cancelled":
+      case "expired":
+      case "failed": return "destructive";
+      case "free":
       default: return "outline";
     }
   };
@@ -190,6 +303,7 @@ const AdminUsers = () => {
                       <TableHead>User</TableHead>
                       <TableHead>Plan</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Subscription</TableHead>
                       <TableHead>Credits Used</TableHead>
                       <TableHead>Monthly Limit</TableHead>
                       <TableHead>Joined</TableHead>
@@ -215,6 +329,16 @@ const AdminUsers = () => {
                             {user.status || "active"}
                           </Badge>
                         </TableCell>
+                        <TableCell>
+                          {(() => {
+                            const subscriptionStatus = getSubscriptionStatus(user);
+                            return (
+                              <Badge variant={getSubscriptionBadgeVariant(subscriptionStatus)}>
+                                {subscriptionStatus}
+                              </Badge>
+                            );
+                          })()}
+                        </TableCell>
                         <TableCell className="text-sm">
                           <div className="flex items-center gap-2">
                             <Zap className="h-3 w-3 text-yellow-500" />
@@ -224,8 +348,8 @@ const AdminUsers = () => {
                           </div>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          {user.monthly_generation_limit === 999 
-                            ? "Unlimited" 
+                          {user.monthly_generation_limit === 999
+                            ? "Unlimited"
                             : `${user.monthly_generation_limit}/mo`}
                           {user.monthly_generation_limit && user.monthly_generation_limit !== 999 && (
                             <div className="text-xs mt-1">
@@ -234,7 +358,7 @@ const AdminUsers = () => {
                           )}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          {user.created_at 
+                          {user.created_at
                             ? new Date(user.created_at).toLocaleDateString()
                             : "—"}
                         </TableCell>
@@ -267,7 +391,15 @@ const AdminUsers = () => {
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => updateUserPlan(user.id, "free")}>
                                 <ArrowDownCircle className="h-4 w-4 mr-2" />
-                                Downgrade to Free
+                                Set plan to Free
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => updateSubscriptionStatus(user.id, "active")}>
+                                <UserCheck className="h-4 w-4 mr-2" />
+                                Mark subscription active
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => updateSubscriptionStatus(user.id, "cancelled")}>
+                                <UserX className="h-4 w-4 mr-2" />
+                                Mark subscription cancelled
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>

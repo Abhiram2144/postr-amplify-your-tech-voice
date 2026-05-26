@@ -286,7 +286,7 @@ const DashboardSidebar = ({ profile, collapsed, onToggleCollapse }: DashboardSid
                       {profile?.full_name || profile?.email?.split("@")[0] || "User"}
                     </p>
                     <span className={`text-xs px-2 py-0.5 rounded-full ${getPlanBadgeColor(effectivePlan)}`}>
-                      {STRIPE_PLANS[effectivePlan].name}
+                      {STRIPE_PLANS[effectivePlan]?.name ?? STRIPE_PLANS.free.name}
                     </span>
                   </motion.div>
                 )}

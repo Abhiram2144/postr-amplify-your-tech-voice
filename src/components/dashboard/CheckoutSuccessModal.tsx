@@ -4,6 +4,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Trophy, Zap, PartyPopper, Rocket, X, Loader2 } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
+import { STRIPE_PLANS, type PlanType } from "@/lib/stripe-config";
 
 interface CheckoutSuccessModalProps {
   open: boolean;
@@ -37,24 +38,34 @@ const CheckoutSuccessModal = ({ open, onClose }: CheckoutSuccessModalProps) => {
     };
   }, [open, checkSubscription]);
 
+  const formatLimit = (value: number | "unlimited") =>
+    value === "unlimited" ? "Unlimited" : `${value}`;
+
+  const buildCreditsLabel = (planKey: PlanType) => {
+    const limits = STRIPE_PLANS[planKey].limits;
+    const ideas = formatLimit(limits.ideasPerMonth as number | "unlimited");
+    const videos = formatLimit(limits.videosPerMonth as number | "unlimited");
+    return `${ideas} ideas & ${videos} videos`;
+  };
+
   const planDetails = {
     creator: {
-      name: "Creator",
-      credits: "100 ideas & 20 videos",
+      name: STRIPE_PLANS.creator.name,
+      credits: buildCreditsLabel("creator"),
       icon: Sparkles,
       gradient: "from-primary to-accent",
       emoji: "🎨",
     },
     pro: {
-      name: "Pro",
-      credits: "Unlimited ideas & videos",
+      name: STRIPE_PLANS.pro.name,
+      credits: buildCreditsLabel("pro"),
       icon: Trophy,
       gradient: "from-accent to-primary",
       emoji: "👑",
     },
     free: {
-      name: "Free",
-      credits: "5 ideas & 2 videos",
+      name: STRIPE_PLANS.free.name,
+      credits: buildCreditsLabel("free"),
       icon: Zap,
       gradient: "from-muted to-muted-foreground",
       emoji: "⚡",

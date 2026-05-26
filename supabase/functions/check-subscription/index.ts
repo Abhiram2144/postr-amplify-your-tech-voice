@@ -1,6 +1,85 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { BILLING_LIMITS, getBillingLimits, getBillingPlanFromProductId, getBillingPlanName, getDodoClient } from "../_shared/billing.ts";
+import DodoPayments from "npm:dodopayments";
+
+type BillingPlan = "free" | "creator" | "pro";
+type SubscriptionStatus = "free" | "active" | "cancelling" | "cancelled" | "expired" | "failed" | "on_hold";
+
+const isDodoTestMode = () => {
+  const mode = (Deno.env.get("DODO_PAYMENTS_ENV") ?? "").toLowerCase();
+  return mode === "test" || mode === "test_mode" || mode === "testmode";
+};
+
+const BILLING_LIMITS: Record<BillingPlan, { monthly_generation_limit: number; monthly_video_limit: number }> = {
+  free: { monthly_generation_limit: 10, monthly_video_limit: 2 },
+  creator: { monthly_generation_limit: 60, monthly_video_limit: 20 },
+  pro: { monthly_generation_limit: 150, monthly_video_limit: 999 },
+};
+
+const getBillingPlanIds = () => isDodoTestMode()
+  ? {
+    creator: Deno.env.get("VITE_DODO_PAYMENTS_TEST_CREATOR_PLAN_ID")
+      ?? Deno.env.get("DODO_PAYMENTS_TEST_CREATOR_PLAN_ID")
+      ?? "",
+    pro: Deno.env.get("VITE_DODO_PAYMENTS_TEST_PRO_PLAN_ID")
+      ?? Deno.env.get("DODO_PAYMENTS_TEST_PRO_PLAN_ID")
+      ?? "",
+  }
+  : {
+    creator: Deno.env.get("VITE_DODO_PAYMENTS_LIVE_CREATOR_PLAN_ID")
+      ?? Deno.env.get("DODO_PAYMENTS_LIVE_CREATOR_PLAN_ID")
+      ?? "",
+    pro: Deno.env.get("VITE_DODO_PAYMENTS_LIVE_PRO_PLAN_ID")
+      ?? Deno.env.get("DODO_PAYMENTS_LIVE_PRO_PLAN_ID")
+      ?? "",
+  };
+
+const getDodoApiKey = () =>
+  isDodoTestMode()
+    ? Deno.env.get("DODO_PAYMENTS_TEST_API_KEY")
+      ?? Deno.env.get("DODO_PAYMENTS_API_KEY")
+      ?? ""
+    : Deno.env.get("DODO_PAYMENTS_LIVE_API_KEY")
+      ?? Deno.env.get("DODO_PAYMENTS_API_KEY")
+      ?? "";
+
+const getDodoWebhookSecret = () =>
+  isDodoTestMode()
+    ? Deno.env.get("DODO_PAYMENTS_TEST_WEBHOOK_SECRET")
+      ?? Deno.env.get("DODO_PAYMENTS_WEBHOOK_KEY")
+      ?? ""
+    : Deno.env.get("DODO_PAYMENTS_LIVE_WEBHOOK_SECRET")
+      ?? Deno.env.get("DODO_PAYMENTS_WEBHOOK_KEY")
+      ?? "";
+
+const getDodoClient = () => {
+  const apiKey = getDodoApiKey();
+  if (!apiKey) {
+    throw new Error("DODO_PAYMENTS_LIVE_API_KEY is not set");
+  }
+
+  return new DodoPayments({
+    bearerToken: apiKey,
+    webhookKey: getDodoWebhookSecret() || undefined,
+    environment: isDodoTestMode() ? "test_mode" : "live_mode",
+  });
+};
+
+const getBillingPlanFromProductId = (productId?: string | null): BillingPlan => {
+  const billingPlanIds = getBillingPlanIds();
+  if (!productId) return "free";
+  if (productId === billingPlanIds.creator) return "creator";
+  if (productId === billingPlanIds.pro) return "pro";
+  return "free";
+};
+
+const getBillingLimits = (plan: BillingPlan) => BILLING_LIMITS[plan];
+
+const getBillingPlanName = (plan: BillingPlan) => {
+  if (plan === "creator") return "Creator";
+  if (plan === "pro") return "Pro";
+  return "free";
+};
 
 const ALLOWED_ORIGINS = [
   "https://postr-genius.lovable.app",
@@ -32,11 +111,17 @@ const getSafeErrorMessage = (error: unknown) => {
   return "An error occurred. Please try again later.";
 };
 
-const updateFreePlan = async (supabaseClient: ReturnType<typeof createClient>, userId: string, customerId?: string | null) => {
+const updateFreePlan = async (
+  supabaseClient: ReturnType<typeof createClient>,
+  userId: string,
+  customerId?: string | null,
+) => {
   await supabaseClient.from("users").update({
     plan: "free",
     plan_started_at: null,
     plan_expires_at: null,
+    subscription_status: "free",
+    plan_override_by_admin: false,
     monthly_generation_limit: BILLING_LIMITS.free.monthly_generation_limit,
     monthly_video_limit: BILLING_LIMITS.free.monthly_video_limit,
   }).eq("id", userId);
@@ -54,15 +139,30 @@ const updateActivePlan = async (
   supabaseClient: ReturnType<typeof createClient>,
   userId: string,
   customerId: string,
-  subscription: { subscription_id: string; product_id: string; previous_billing_date: string; next_billing_date: string; cancel_at_next_billing_date?: boolean },
+  subscription: {
+    subscription_id: string;
+    product_id: string;
+    previous_billing_date: string;
+    next_billing_date: string;
+    status?: string | null;
+    cancel_at_next_billing_date?: boolean | null;
+  },
 ) => {
   const plan = getBillingPlanFromProductId(subscription.product_id);
   const limits = getBillingLimits(plan);
+
+  const rawStatus = (subscription.status ?? "").toLowerCase();
+  const subscriptionStatus: SubscriptionStatus =
+    rawStatus === "on_hold" ? "on_hold" :
+    subscription.cancel_at_next_billing_date ? "cancelling" :
+    "active";
 
   await supabaseClient.from("users").update({
     plan: getBillingPlanName(plan),
     plan_started_at: subscription.previous_billing_date || new Date().toISOString(),
     plan_expires_at: subscription.next_billing_date || null,
+    subscription_status: subscriptionStatus,
+    plan_override_by_admin: false,
     ...limits,
   }).eq("id", userId);
 
@@ -100,6 +200,28 @@ serve(async (req) => {
     const user = data.user;
     if (!user?.email) throw new Error("User not authenticated or email not available");
 
+    // Check if an admin has manually overridden this user's plan — if so, skip Dodo sync
+    const { data: userData } = await supabaseClient
+      .from("users")
+      .select("plan, plan_expires_at, subscription_status, plan_override_by_admin")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (userData?.plan_override_by_admin) {
+      logStep("Admin override active, returning DB values", { userId: user.id, plan: userData.plan });
+      const plan = userData.plan ?? "free";
+      const planLower = plan.toLowerCase();
+      const isSubscribed = planLower !== "free";
+      const isCancelling = userData.subscription_status === "cancelling";
+      return new Response(JSON.stringify({
+        subscribed: isSubscribed,
+        plan: plan,
+        subscription_end: isCancelling ? (userData.plan_expires_at ?? null) : null,
+        subscription_id: null,
+        cancelling_at: isCancelling ? (userData.plan_expires_at ?? null) : null,
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
+    }
+
     const { data: billingRecord } = await supabaseClient
       .from("user_stripe_data")
       .select("stripe_customer_id, stripe_subscription_id")
@@ -128,15 +250,17 @@ serve(async (req) => {
         product_id: subscriptionFromStorage.product_id,
         previous_billing_date: subscriptionFromStorage.previous_billing_date,
         next_billing_date: subscriptionFromStorage.next_billing_date,
+        status: subscriptionFromStorage.status,
         cancel_at_next_billing_date: subscriptionFromStorage.cancel_at_next_billing_date,
       });
 
+      const isCancelling = subscriptionFromStorage.cancel_at_next_billing_date;
       return new Response(JSON.stringify({
         subscribed: true,
         plan: getBillingPlanName(getBillingPlanFromProductId(subscriptionFromStorage.product_id)),
         subscription_end: subscriptionFromStorage.next_billing_date || null,
         subscription_id: subscriptionFromStorage.subscription_id,
-        cancelling_at: subscriptionFromStorage.cancel_at_next_billing_date ? subscriptionFromStorage.next_billing_date || null : null,
+        cancelling_at: isCancelling ? subscriptionFromStorage.next_billing_date || null : null,
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
     }
 
@@ -163,15 +287,17 @@ serve(async (req) => {
       product_id: subscription.product_id,
       previous_billing_date: subscription.previous_billing_date,
       next_billing_date: subscription.next_billing_date,
+      status: subscription.status,
       cancel_at_next_billing_date: subscription.cancel_at_next_billing_date,
     });
 
+    const isCancelling = subscription.cancel_at_next_billing_date;
     return new Response(JSON.stringify({
       subscribed: true,
       plan: getBillingPlanName(getBillingPlanFromProductId(subscription.product_id)),
       subscription_end: subscription.next_billing_date || null,
       subscription_id: subscription.subscription_id,
-      cancelling_at: subscription.cancel_at_next_billing_date ? subscription.next_billing_date || null : null,
+      cancelling_at: isCancelling ? subscription.next_billing_date || null : null,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);

@@ -1,7 +1,48 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
-import { getDodoClient, getDisplayName } from "../_shared/billing.ts";
+import DodoPayments from "npm:dodopayments";
+
+const isDodoTestMode = () => {
+  const mode = (Deno.env.get("DODO_PAYMENTS_ENV") ?? "").toLowerCase();
+  return mode === "test" || mode === "test_mode" || mode === "testmode";
+};
+
+const getDodoApiKey = () =>
+  isDodoTestMode()
+    ? Deno.env.get("DODO_PAYMENTS_TEST_API_KEY")
+      ?? Deno.env.get("DODO_PAYMENTS_API_KEY")
+      ?? ""
+    : Deno.env.get("DODO_PAYMENTS_LIVE_API_KEY")
+      ?? Deno.env.get("DODO_PAYMENTS_API_KEY")
+      ?? "";
+
+const getDodoWebhookSecret = () =>
+  isDodoTestMode()
+    ? Deno.env.get("DODO_PAYMENTS_TEST_WEBHOOK_SECRET")
+      ?? Deno.env.get("DODO_PAYMENTS_WEBHOOK_KEY")
+      ?? ""
+    : Deno.env.get("DODO_PAYMENTS_LIVE_WEBHOOK_SECRET")
+      ?? Deno.env.get("DODO_PAYMENTS_WEBHOOK_KEY")
+      ?? "";
+
+const getDodoClient = () => {
+  const apiKey = getDodoApiKey();
+  if (!apiKey) {
+    throw new Error("DODO_PAYMENTS_LIVE_API_KEY is not set");
+  }
+
+  return new DodoPayments({
+    bearerToken: apiKey,
+    webhookKey: getDodoWebhookSecret() || undefined,
+    environment: isDodoTestMode() ? "test_mode" : "live_mode",
+  });
+};
+
+const getDisplayName = (email: string, fullName?: string | null) => {
+  if (fullName && fullName.trim()) return fullName.trim();
+  return email.split("@")[0] || email;
+};
 
 // CORS configuration with origin restrictions
 const ALLOWED_ORIGINS = [
@@ -24,6 +65,22 @@ const getCorsHeaders = (origin: string | null) => {
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
     "Access-Control-Allow-Credentials": "true",
   };
+};
+
+const sanitizeHeadersForLog = (headers: Headers) => {
+  const obj: Record<string, unknown> = {};
+  for (const [k, v] of headers.entries()) {
+    if (k.toLowerCase() === "authorization") {
+      // mask token except first/last 6 chars
+      const token = v.replace(/^Bearer\s+/i, "");
+      const visibleStart = token.slice(0, 6);
+      const visibleEnd = token.slice(-6);
+      obj[k] = token.length > 12 ? `${visibleStart}...${visibleEnd}` : "[masked]";
+    } else {
+      obj[k] = typeof v === "string" && v.length > 200 ? `${v.slice(0, 200)}...` : v;
+    }
+  }
+  return obj;
 };
 
 const logStep = (step: string, details?: Record<string, unknown>) => {
@@ -96,8 +153,25 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
+    // Log incoming headers (safely) to help debug missing auth
+    try {
+      const headerSnapshot = sanitizeHeadersForLog(req.headers);
+      logStep("Incoming headers", headerSnapshot as Record<string, unknown>);
+    } catch (e) {
+      console.warn("Failed to snapshot headers for log", String(e));
+    }
+
     // Validate request body
-    const body = await req.json();
+    let body: unknown;
+    try {
+      body = await req.json();
+      // Log a sanitized body preview (avoid logging tokens)
+      const bodyPreview = typeof body === "object" && body !== null ? JSON.stringify(body).slice(0, 1000) : String(body);
+      logStep("Request body preview", { body: bodyPreview });
+    } catch (e) {
+      logStep("Invalid JSON in request body", { error: String(e) });
+      return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     const validation = checkoutSchema.safeParse(body);
     
     if (!validation.success) {

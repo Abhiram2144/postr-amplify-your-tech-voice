@@ -50,12 +50,17 @@ const DashboardOverview = () => {
   const { creditsUsed, creditsLimit, creditsRemaining, loading: creditsLoading } = useCredits();
   const { videoUsed, loading: videoLoading } = useVideoUsage();
 
-  // Check for checkout success param
+  // Check for checkout success param or Dodo return params
   useEffect(() => {
-    if (searchParams.get("checkout") === "success") {
+    const checkoutSuccess = searchParams.get("checkout") === "success";
+    const status = (searchParams.get("status") ?? "").toLowerCase();
+    const subscriptionId = searchParams.get("subscription_id");
+    const dodoSuccess = status === "active" || Boolean(subscriptionId);
+
+    if (checkoutSuccess || dodoSuccess) {
       setShowCheckoutSuccess(true);
-      // Remove the query param
-      searchParams.delete("checkout");
+      // Remove checkout and Dodo params
+      ["checkout", "subscription_id", "status", "email"].forEach((key) => searchParams.delete(key));
       setSearchParams(searchParams, { replace: true });
       // Refresh subscription status
       checkSubscription();

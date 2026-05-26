@@ -26,6 +26,13 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   const [cancellingAt, setCancellingAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const normalizePlan = (value?: string | null): PlanType => {
+    const normalized = (value ?? "").toLowerCase();
+    if (normalized.includes("pro")) return "pro";
+    if (normalized.includes("creator")) return "creator";
+    return "free";
+  };
+
   const checkSubscription = useCallback(async () => {
     if (!session?.access_token) {
       setPlan("free");
@@ -46,7 +53,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
 
       if (error) throw error;
 
-      setPlan(data.plan || "free");
+      setPlan(normalizePlan(data.plan));
       setSubscribed(data.subscribed || false);
       setSubscriptionEnd(data.subscription_end || null);
       setCancellingAt(data.cancelling_at || null);
@@ -160,10 +167,31 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   // Check subscription every minute
   useEffect(() => {
     if (!user) return;
-    
+
     const interval = setInterval(checkSubscription, 60000);
     return () => clearInterval(interval);
   }, [user, checkSubscription]);
+
+  // Real-time: re-check whenever the user's DB row changes (admin actions, webhooks)
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel(`user-subscription-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "users",
+          filter: `id=eq.${user.id}`,
+        },
+        () => { checkSubscription(); },
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id, checkSubscription]);
 
   return (
     <SubscriptionContext.Provider

@@ -1,6 +1,41 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { getDodoClient } from "../_shared/billing.ts";
+import DodoPayments from "npm:dodopayments";
+const isDodoTestMode = () => {
+  const mode = (Deno.env.get("DODO_PAYMENTS_ENV") ?? "").toLowerCase();
+  return mode === "test" || mode === "test_mode" || mode === "testmode";
+};
+
+const getDodoApiKey = () =>
+  isDodoTestMode()
+    ? Deno.env.get("DODO_PAYMENTS_TEST_API_KEY")
+      ?? Deno.env.get("DODO_PAYMENTS_API_KEY")
+      ?? ""
+    : Deno.env.get("DODO_PAYMENTS_LIVE_API_KEY")
+      ?? Deno.env.get("DODO_PAYMENTS_API_KEY")
+      ?? "";
+
+const getDodoWebhookSecret = () =>
+  isDodoTestMode()
+    ? Deno.env.get("DODO_PAYMENTS_TEST_WEBHOOK_SECRET")
+      ?? Deno.env.get("DODO_PAYMENTS_WEBHOOK_KEY")
+      ?? ""
+    : Deno.env.get("DODO_PAYMENTS_LIVE_WEBHOOK_SECRET")
+      ?? Deno.env.get("DODO_PAYMENTS_WEBHOOK_KEY")
+      ?? "";
+
+const getDodoClient = () => {
+  const apiKey = getDodoApiKey();
+  if (!apiKey) {
+    throw new Error("DODO_PAYMENTS_LIVE_API_KEY is not set");
+  }
+
+  return new DodoPayments({
+    bearerToken: apiKey,
+    webhookKey: getDodoWebhookSecret() || undefined,
+    environment: isDodoTestMode() ? "test_mode" : "live_mode",
+  });
+};
 import { getCorsHeaders, handleCorsOptions } from "../_shared/cors.ts";
 
 const logStep = (step: string, details?: Record<string, unknown>) => {
@@ -84,6 +119,8 @@ serve(async (req) => {
 
     await supabaseClient.from("users").update({
       plan_expires_at: periodEndDate,
+      subscription_status: "cancelling",
+      plan_override_by_admin: false,
       updated_at: new Date().toISOString(),
     }).eq("id", user.id);
 

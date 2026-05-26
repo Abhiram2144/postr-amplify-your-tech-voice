@@ -1,6 +1,85 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { BILLING_LIMITS, getBillingLimits, getBillingPlanFromProductId, getBillingPlanName, getDodoClient, getDodoWebhookSecret } from "../_shared/billing.ts";
+import DodoPayments from "npm:dodopayments";
+
+type BillingPlan = "free" | "creator" | "pro";
+type SubscriptionStatus = "free" | "active" | "cancelling" | "cancelled" | "expired" | "failed" | "on_hold";
+
+const isDodoTestMode = () => {
+  const mode = (Deno.env.get("DODO_PAYMENTS_ENV") ?? "").toLowerCase();
+  return mode === "test" || mode === "test_mode" || mode === "testmode";
+};
+
+const BILLING_LIMITS: Record<BillingPlan, { monthly_generation_limit: number; monthly_video_limit: number }> = {
+  free: { monthly_generation_limit: 10, monthly_video_limit: 2 },
+  creator: { monthly_generation_limit: 60, monthly_video_limit: 20 },
+  pro: { monthly_generation_limit: 150, monthly_video_limit: 999 },
+};
+
+const getBillingPlanIds = () => isDodoTestMode()
+  ? {
+    creator: Deno.env.get("VITE_DODO_PAYMENTS_TEST_CREATOR_PLAN_ID")
+      ?? Deno.env.get("DODO_PAYMENTS_TEST_CREATOR_PLAN_ID")
+      ?? "",
+    pro: Deno.env.get("VITE_DODO_PAYMENTS_TEST_PRO_PLAN_ID")
+      ?? Deno.env.get("DODO_PAYMENTS_TEST_PRO_PLAN_ID")
+      ?? "",
+  }
+  : {
+    creator: Deno.env.get("VITE_DODO_PAYMENTS_LIVE_CREATOR_PLAN_ID")
+      ?? Deno.env.get("DODO_PAYMENTS_LIVE_CREATOR_PLAN_ID")
+      ?? "",
+    pro: Deno.env.get("VITE_DODO_PAYMENTS_LIVE_PRO_PLAN_ID")
+      ?? Deno.env.get("DODO_PAYMENTS_LIVE_PRO_PLAN_ID")
+      ?? "",
+  };
+
+const getDodoApiKey = () =>
+  isDodoTestMode()
+    ? Deno.env.get("DODO_PAYMENTS_TEST_API_KEY")
+      ?? Deno.env.get("DODO_PAYMENTS_API_KEY")
+      ?? ""
+    : Deno.env.get("DODO_PAYMENTS_LIVE_API_KEY")
+      ?? Deno.env.get("DODO_PAYMENTS_API_KEY")
+      ?? "";
+
+const getDodoWebhookSecret = () =>
+  isDodoTestMode()
+    ? Deno.env.get("DODO_PAYMENTS_TEST_WEBHOOK_SECRET")
+      ?? Deno.env.get("DODO_PAYMENTS_WEBHOOK_KEY")
+      ?? ""
+    : Deno.env.get("DODO_PAYMENTS_LIVE_WEBHOOK_SECRET")
+      ?? Deno.env.get("DODO_PAYMENTS_WEBHOOK_KEY")
+      ?? "";
+
+const getDodoClient = () => {
+  const apiKey = getDodoApiKey();
+  if (!apiKey) {
+    throw new Error("DODO_PAYMENTS_LIVE_API_KEY is not set");
+  }
+
+  return new DodoPayments({
+    bearerToken: apiKey,
+    webhookKey: getDodoWebhookSecret() || undefined,
+    environment: isDodoTestMode() ? "test_mode" : "live_mode",
+  });
+};
+
+const getBillingPlanFromProductId = (productId?: string | null): BillingPlan => {
+  const billingPlanIds = getBillingPlanIds();
+  if (!productId) return "free";
+  if (productId === billingPlanIds.creator) return "creator";
+  if (productId === billingPlanIds.pro) return "pro";
+  return "free";
+};
+
+const getBillingLimits = (plan: BillingPlan) => BILLING_LIMITS[plan];
+
+const getBillingPlanName = (plan: BillingPlan) => {
+  if (plan === "creator") return "Creator";
+  if (plan === "pro") return "Pro";
+  return "free";
+};
 
 const logStep = (step: string, details?: Record<string, unknown>) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : "";
@@ -32,6 +111,7 @@ const setUserPlan = async (
   productId: string,
   startedAt?: string | null,
   expiresAt?: string | null,
+  subscriptionStatus: SubscriptionStatus = "active",
 ) => {
   const plan = getBillingPlanFromProductId(productId);
   const limits = getBillingLimits(plan);
@@ -42,18 +122,27 @@ const setUserPlan = async (
       plan: getBillingPlanName(plan),
       plan_started_at: startedAt ?? new Date().toISOString(),
       plan_expires_at: expiresAt ?? null,
+      subscription_status: subscriptionStatus,
+      plan_override_by_admin: false,
       ...limits,
     })
     .eq("id", userId);
 };
 
-const downgradeToFree = async (supabaseClient: ReturnType<typeof createClient>, userId: string, keepCustomerId?: string | null) => {
+const downgradeToFree = async (
+  supabaseClient: ReturnType<typeof createClient>,
+  userId: string,
+  keepCustomerId?: string | null,
+  subscriptionStatus: SubscriptionStatus = "cancelled",
+) => {
   await supabaseClient
     .from("users")
     .update({
       plan: "free",
       plan_started_at: null,
       plan_expires_at: null,
+      subscription_status: subscriptionStatus,
+      plan_override_by_admin: false,
       monthly_generation_limit: BILLING_LIMITS.free.monthly_generation_limit,
       monthly_video_limit: BILLING_LIMITS.free.monthly_video_limit,
     })
@@ -72,14 +161,22 @@ const syncSubscription = async (
     previous_billing_date: string;
     next_billing_date: string;
     status?: string | null;
+    cancel_at_next_billing_date?: boolean | null;
   },
 ) => {
+  const rawStatus = (subscription.status ?? "").toLowerCase();
+  const subscriptionStatus: SubscriptionStatus =
+    rawStatus === "on_hold" ? "on_hold" :
+    subscription.cancel_at_next_billing_date ? "cancelling" :
+    "active";
+
   await setUserPlan(
     supabaseClient,
     userId,
     subscription.product_id,
     subscription.previous_billing_date,
     subscription.next_billing_date,
+    subscriptionStatus,
   );
 
   await upsertBillingRecord(supabaseClient, userId, customerId, subscription.subscription_id);
@@ -147,6 +244,7 @@ serve(async (req) => {
             payment.product_cart[0].product_id,
             payment.updated_at ?? payment.created_at ?? new Date().toISOString(),
             payment.updated_at ?? payment.created_at ?? null,
+            "active",
           );
         }
         break;
@@ -167,7 +265,7 @@ serve(async (req) => {
           if (status === "active" || status === "on_hold") {
             await syncSubscription(supabaseClient, userId, payment.customer.customer_id, subscription);
           } else if (status === "cancelled" || status === "expired" || status === "failed") {
-            await downgradeToFree(supabaseClient, userId, payment.customer.customer_id);
+            await downgradeToFree(supabaseClient, userId, payment.customer.customer_id, status as SubscriptionStatus);
           }
         }
         break;
@@ -181,19 +279,31 @@ serve(async (req) => {
         const subscription = event.data;
         const userId = await findUserByEmail(supabaseClient, subscription.customer.email);
         if (!userId) break;
-
         await syncSubscription(supabaseClient, userId, subscription.customer.customer_id, subscription);
         break;
       }
 
-      case "subscription.cancelled":
-      case "subscription.expired":
+      case "subscription.cancelled": {
+        const subscription = event.data;
+        const userId = await findUserByEmail(supabaseClient, subscription.customer.email);
+        if (!userId) break;
+        await downgradeToFree(supabaseClient, userId, subscription.customer.customer_id, "cancelled");
+        break;
+      }
+
+      case "subscription.expired": {
+        const subscription = event.data;
+        const userId = await findUserByEmail(supabaseClient, subscription.customer.email);
+        if (!userId) break;
+        await downgradeToFree(supabaseClient, userId, subscription.customer.customer_id, "expired");
+        break;
+      }
+
       case "subscription.failed": {
         const subscription = event.data;
         const userId = await findUserByEmail(supabaseClient, subscription.customer.email);
         if (!userId) break;
-
-        await downgradeToFree(supabaseClient, userId, subscription.customer.customer_id);
+        await downgradeToFree(supabaseClient, userId, subscription.customer.customer_id, "failed");
         break;
       }
 

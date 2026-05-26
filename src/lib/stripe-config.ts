@@ -1,6 +1,20 @@
 // Dodo Payments product configuration
-const DODO_CREATOR_PRODUCT_ID = import.meta.env.VITE_DODO_PAYMENTS_LIVE_CREATOR_PLAN_ID ?? "pdt_0NfdX0P9ZkOoqgRFPDbB0";
-const DODO_PRO_PRODUCT_ID = import.meta.env.VITE_DODO_PAYMENTS_LIVE_PRO_PLAN_ID ?? "pdt_0NfdXA9uKpt86ZvHFlGfD";
+const isDodoTestMode = () => {
+  const mode = (import.meta.env.VITE_DODO_PAYMENTS_ENV ?? "").toLowerCase();
+  return mode === "test" || mode === "test_mode" || mode === "testmode";
+};
+
+const DODO_CREATOR_PRODUCT_ID = isDodoTestMode()
+  ? import.meta.env.VITE_DODO_PAYMENTS_TEST_CREATOR_PLAN_ID
+    ?? "pdt_0NffmIHXyeyk4FbvQp7ws"
+  : import.meta.env.VITE_DODO_PAYMENTS_LIVE_CREATOR_PLAN_ID
+    ?? "pdt_0NfdX0P9ZkOoqgRFPDbB0";
+
+const DODO_PRO_PRODUCT_ID = isDodoTestMode()
+  ? import.meta.env.VITE_DODO_PAYMENTS_TEST_PRO_PLAN_ID
+    ?? "pdt_0NffmNtlpKjbXPnkuOXmz"
+  : import.meta.env.VITE_DODO_PAYMENTS_LIVE_PRO_PLAN_ID
+    ?? "pdt_0NfdXA9uKpt86ZvHFlGfD";
 
 export const STRIPE_PLANS = {
   creator: {
