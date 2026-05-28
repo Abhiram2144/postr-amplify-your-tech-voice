@@ -195,9 +195,32 @@ serve(async (req) => {
     logStep("User authenticated", { userId: user.id });
 
     // Use validated origin or fallback
-    const returnOrigin = origin && ALLOWED_ORIGINS.includes(origin) 
-      ? origin 
+    const returnOrigin = origin && ALLOWED_ORIGINS.includes(origin)
+      ? origin
       : ALLOWED_ORIGINS[0];
+
+    // Determine which plan was purchased so we can show the correct name in
+    // the success modal immediately, without waiting for the Dodo webhook.
+    const testCreatorId = Deno.env.get("VITE_DODO_PAYMENTS_TEST_CREATOR_PLAN_ID") ?? Deno.env.get("DODO_PAYMENTS_TEST_CREATOR_PLAN_ID") ?? "";
+    const testProId = Deno.env.get("VITE_DODO_PAYMENTS_TEST_PRO_PLAN_ID") ?? Deno.env.get("DODO_PAYMENTS_TEST_PRO_PLAN_ID") ?? "";
+    const liveCreatorId = Deno.env.get("VITE_DODO_PAYMENTS_LIVE_CREATOR_PLAN_ID") ?? Deno.env.get("DODO_PAYMENTS_LIVE_CREATOR_PLAN_ID") ?? "";
+    const liveProId = Deno.env.get("VITE_DODO_PAYMENTS_LIVE_PRO_PLAN_ID") ?? Deno.env.get("DODO_PAYMENTS_LIVE_PRO_PLAN_ID") ?? "";
+    const isTestMode = (Deno.env.get("DODO_PAYMENTS_ENV") ?? "").toLowerCase().startsWith("test");
+    const creatorId = isTestMode ? testCreatorId : liveCreatorId;
+    const proId = isTestMode ? testProId : liveProId;
+    const normalizedPriceId = priceId.toLowerCase();
+    const purchasedPlan =
+      priceId === proId || normalizedPriceId.includes("pro")
+        ? "pro"
+        : priceId === creatorId || normalizedPriceId.includes("creator")
+          ? "creator"
+          : "unknown";
+
+    const returnParams = new URLSearchParams({
+      checkout: "success",
+      purchased_plan: purchasedPlan,
+      purchased_price_id: priceId,
+    });
 
     const checkoutSession = await dodo.checkoutSessions.create({
       product_cart: [
@@ -210,7 +233,7 @@ serve(async (req) => {
         email: user.email,
         name: getDisplayName(user.email, user.user_metadata?.full_name ?? user.user_metadata?.name ?? null),
       },
-      return_url: `${returnOrigin}/dashboard?checkout=success`,
+      return_url: `${returnOrigin}/dashboard?${returnParams.toString()}`,
       cancel_url: `${returnOrigin}/pricing?checkout=canceled`,
       short_link: true,
       confirm: false,

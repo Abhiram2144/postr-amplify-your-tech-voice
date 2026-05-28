@@ -16,23 +16,29 @@ const BILLING_LIMITS: Record<BillingPlan, { monthly_generation_limit: number; mo
   pro: { monthly_generation_limit: 150, monthly_video_limit: 999 },
 };
 
-const getBillingPlanIds = () => isDodoTestMode()
-  ? {
-    creator: Deno.env.get("VITE_DODO_PAYMENTS_TEST_CREATOR_PLAN_ID")
-      ?? Deno.env.get("DODO_PAYMENTS_TEST_CREATOR_PLAN_ID")
-      ?? "",
-    pro: Deno.env.get("VITE_DODO_PAYMENTS_TEST_PRO_PLAN_ID")
-      ?? Deno.env.get("DODO_PAYMENTS_TEST_PRO_PLAN_ID")
-      ?? "",
-  }
-  : {
-    creator: Deno.env.get("VITE_DODO_PAYMENTS_LIVE_CREATOR_PLAN_ID")
-      ?? Deno.env.get("DODO_PAYMENTS_LIVE_CREATOR_PLAN_ID")
-      ?? "",
-    pro: Deno.env.get("VITE_DODO_PAYMENTS_LIVE_PRO_PLAN_ID")
-      ?? Deno.env.get("DODO_PAYMENTS_LIVE_PRO_PLAN_ID")
-      ?? "",
-  };
+const getBillingPlanIds = () => {
+  const creator = [
+    Deno.env.get("VITE_DODO_PAYMENTS_TEST_CREATOR_PLAN_ID"),
+    Deno.env.get("DODO_PAYMENTS_TEST_CREATOR_PLAN_ID"),
+    Deno.env.get("VITE_DODO_PAYMENTS_LIVE_CREATOR_PLAN_ID"),
+    Deno.env.get("DODO_PAYMENTS_LIVE_CREATOR_PLAN_ID"),
+    // Safe fallback defaults used by the frontend config.
+    "pdt_0NffmIHXyeyk4FbvQp7ws",
+    "pdt_0NfdX0P9ZkOoqgRFPDbB0",
+  ].filter((id): id is string => Boolean(id));
+
+  const pro = [
+    Deno.env.get("VITE_DODO_PAYMENTS_TEST_PRO_PLAN_ID"),
+    Deno.env.get("DODO_PAYMENTS_TEST_PRO_PLAN_ID"),
+    Deno.env.get("VITE_DODO_PAYMENTS_LIVE_PRO_PLAN_ID"),
+    Deno.env.get("DODO_PAYMENTS_LIVE_PRO_PLAN_ID"),
+    // Safe fallback defaults used by the frontend config.
+    "pdt_0NffmNtlpKjbXPnkuOXmz",
+    "pdt_0NfdXA9uKpt86ZvHFlGfD",
+  ].filter((id): id is string => Boolean(id));
+
+  return { creator, pro };
+};
 
 const getDodoApiKey = () =>
   isDodoTestMode()
@@ -68,8 +74,9 @@ const getDodoClient = () => {
 const getBillingPlanFromProductId = (productId?: string | null): BillingPlan => {
   const billingPlanIds = getBillingPlanIds();
   if (!productId) return "free";
-  if (productId === billingPlanIds.creator) return "creator";
-  if (productId === billingPlanIds.pro) return "pro";
+  if (billingPlanIds.creator.includes(productId)) return "creator";
+  if (billingPlanIds.pro.includes(productId)) return "pro";
+  logStep("Unknown product_id when mapping plan", { productId, mode: isDodoTestMode() ? "test_mode" : "live_mode" });
   return "free";
 };
 
@@ -78,6 +85,18 @@ const getBillingLimits = (plan: BillingPlan) => BILLING_LIMITS[plan];
 const getBillingPlanName = (plan: BillingPlan) => {
   if (plan === "creator") return "Creator";
   if (plan === "pro") return "Pro";
+  return "free";
+};
+
+const getCheckoutPlanFallback = (rawPlan?: string | null, rawPriceId?: string | null): BillingPlan => {
+  const normalizedPlan = (rawPlan ?? "").toLowerCase();
+  if (normalizedPlan.includes("pro")) return "pro";
+  if (normalizedPlan.includes("creator")) return "creator";
+
+  const normalizedPriceId = (rawPriceId ?? "").toLowerCase();
+  if (normalizedPriceId.includes("pro")) return "pro";
+  if (normalizedPriceId.includes("creator")) return "creator";
+
   return "free";
 };
 
@@ -101,6 +120,93 @@ const logStep = (step: string, details?: Record<string, unknown>) => {
   console.log(`[CHECK-SUBSCRIPTION] ${step}${suffix}`);
 };
 
+const recordBillingEvent = async (
+  supabaseClient: ReturnType<typeof createClient>,
+  userId: string,
+  eventType: string,
+  payload: Record<string, unknown>,
+  details?: {
+    eventId?: string | null;
+    status?: string | null;
+    customerId?: string | null;
+    subscriptionId?: string | null;
+    productId?: string | null;
+    email?: string | null;
+  },
+) => {
+  const { data, error } = await supabaseClient.from("billing_events").insert({
+    user_id: userId,
+    provider: "dodo",
+    event_type: eventType,
+    event_id: details?.eventId ?? null,
+    status: details?.status ?? null,
+    customer_id: details?.customerId ?? null,
+    subscription_id: details?.subscriptionId ?? null,
+    product_id: details?.productId ?? null,
+    email: details?.email ?? null,
+    payload,
+    updated_at: new Date().toISOString(),
+  }).select("id");
+
+  if (error) {
+    logStep("Billing event insert failed", { userId, eventType, error: error.message });
+    throw error;
+  }
+
+  if (!data?.length) {
+    throw new Error(`Billing event insert failed for ${eventType}: no rows returned for user ${userId}`);
+  }
+};
+
+const updateUserPlanRow = async (
+  supabaseClient: ReturnType<typeof createClient>,
+  userId: string,
+  values: Record<string, unknown>,
+  context: string,
+) => {
+  logStep(`${context}: updating users row`, { userId, plan: values.plan, subscription_status: values.subscription_status });
+  const { data, error } = await supabaseClient
+    .from("users")
+    .update(values)
+    .eq("id", userId)
+    .select("id");
+
+  if (error) {
+    logStep(`${context}: users update failed`, { userId, error: error.message });
+    throw error;
+  }
+
+  if (!data?.length) {
+    throw new Error(`${context}: no users row found for user ${userId}`);
+  }
+
+  logStep(`${context}: users update success`, { userId, rows: data.length });
+};
+
+const upsertUserStripeData = async (
+  supabaseClient: ReturnType<typeof createClient>,
+  record: Record<string, unknown>,
+  context: string,
+) => {
+  const userId = typeof record.user_id === "string" ? record.user_id : "unknown";
+  logStep(`${context}: upserting user_stripe_data`, { userId, subscriptionId: record.stripe_subscription_id ?? null });
+  const { data, error } = await supabaseClient
+    .from("user_stripe_data")
+    .upsert(record, { onConflict: "user_id" })
+    .select("user_id");
+
+  if (error) {
+    logStep(`${context}: user_stripe_data upsert failed`, { userId, error: error.message });
+    throw error;
+  }
+
+  if (!data?.length) {
+    throw new Error(`${context}: no user_stripe_data row returned for user ${userId}`);
+  }
+
+  logStep(`${context}: user_stripe_data upsert success`, { userId, rows: data.length });
+};
+
 const getSafeErrorMessage = (error: unknown) => {
   if (error instanceof Error) {
     const msg = error.message.toLowerCase();
@@ -116,7 +222,7 @@ const updateFreePlan = async (
   userId: string,
   customerId?: string | null,
 ) => {
-  await supabaseClient.from("users").update({
+  await updateUserPlanRow(supabaseClient, userId, {
     plan: "free",
     plan_started_at: null,
     plan_expires_at: null,
@@ -124,7 +230,7 @@ const updateFreePlan = async (
     plan_override_by_admin: false,
     monthly_generation_limit: BILLING_LIMITS.free.monthly_generation_limit,
     monthly_video_limit: BILLING_LIMITS.free.monthly_video_limit,
-  }).eq("id", userId);
+  }, "updateFreePlan");
 
   const record: Record<string, unknown> = {
     user_id: userId,
@@ -132,7 +238,7 @@ const updateFreePlan = async (
     updated_at: new Date().toISOString(),
   };
   if (customerId !== undefined) record.stripe_customer_id = customerId;
-  await supabaseClient.from("user_stripe_data").upsert(record, { onConflict: "user_id" });
+  await upsertUserStripeData(supabaseClient, record, "updateFreePlan");
 };
 
 const updateActivePlan = async (
@@ -157,21 +263,48 @@ const updateActivePlan = async (
     subscription.cancel_at_next_billing_date ? "cancelling" :
     "active";
 
-  await supabaseClient.from("users").update({
+  await updateUserPlanRow(supabaseClient, userId, {
     plan: getBillingPlanName(plan),
     plan_started_at: subscription.previous_billing_date || new Date().toISOString(),
     plan_expires_at: subscription.next_billing_date || null,
     subscription_status: subscriptionStatus,
     plan_override_by_admin: false,
     ...limits,
-  }).eq("id", userId);
+  }, "updateActivePlan");
 
-  await supabaseClient.from("user_stripe_data").upsert({
+  await upsertUserStripeData(supabaseClient, {
     user_id: userId,
     stripe_customer_id: customerId,
     stripe_subscription_id: subscription.subscription_id,
     updated_at: new Date().toISOString(),
-  }, { onConflict: "user_id" });
+  }, "updateActivePlan");
+};
+
+const updateFromCheckoutFallback = async (
+  supabaseClient: ReturnType<typeof createClient>,
+  userId: string,
+  plan: BillingPlan,
+  subscriptionId?: string | null,
+) => {
+  const limits = getBillingLimits(plan);
+
+  await updateUserPlanRow(supabaseClient, userId, {
+    plan: getBillingPlanName(plan),
+    plan_started_at: new Date().toISOString(),
+    plan_expires_at: null,
+    subscription_status: "active",
+    plan_override_by_admin: false,
+    ...limits,
+  }, "updateFromCheckoutFallback");
+
+  const record: Record<string, unknown> = {
+    user_id: userId,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (subscriptionId !== undefined) record.stripe_subscription_id = subscriptionId;
+
+  await upsertUserStripeData(supabaseClient, record, "updateFromCheckoutFallback");
 };
 
 serve(async (req) => {
@@ -190,6 +323,24 @@ serve(async (req) => {
     logStep("Function started");
     const dodo = getDodoClient();
 
+    // Optional body: caller may pass a known subscriptionId (e.g. from Dodo return URL)
+    // to retrieve and sync it directly, skipping all customer-list timing issues.
+    let requestedSubscriptionId: string | null = null;
+    let requestedCheckoutPlan: BillingPlan = "free";
+    try {
+      const body = await req.json();
+      if (typeof body?.subscriptionId === "string" && body.subscriptionId.trim()) {
+        requestedSubscriptionId = body.subscriptionId.trim();
+        logStep("Direct subscription ID provided", { id: requestedSubscriptionId });
+      }
+      requestedCheckoutPlan = getCheckoutPlanFallback(
+        typeof body?.purchasedPlan === "string" ? body.purchasedPlan : null,
+        typeof body?.purchasedPriceId === "string" ? body.purchasedPriceId : null,
+      );
+    } catch {
+      // Body absent or not JSON — proceed without it
+    }
+
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header provided");
 
@@ -207,7 +358,9 @@ serve(async (req) => {
       .eq("id", user.id)
       .maybeSingle();
 
-    if (userData?.plan_override_by_admin) {
+    const isCheckoutSyncRequest = Boolean(requestedSubscriptionId) || requestedCheckoutPlan !== "free";
+
+    if (userData?.plan_override_by_admin && !isCheckoutSyncRequest) {
       logStep("Admin override active, returning DB values", { userId: user.id, plan: userData.plan });
       const plan = userData.plan ?? "free";
       const planLower = plan.toLowerCase();
@@ -220,6 +373,79 @@ serve(async (req) => {
         subscription_id: null,
         cancelling_at: isCancelling ? (userData.plan_expires_at ?? null) : null,
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
+    }
+
+    if (userData?.plan_override_by_admin) {
+      logStep("Admin override present, but bypassing for checkout sync", {
+        userId: user.id,
+        plan: userData.plan,
+        checkoutSubscriptionId: requestedSubscriptionId,
+        checkoutPlan: requestedCheckoutPlan,
+      });
+    }
+
+    // Fast path: if caller supplied a subscription_id (e.g. from Dodo's return URL),
+    // retrieve it directly and sync — no need to list customers or subscriptions.
+    if (requestedSubscriptionId) {
+      try {
+        const sub = await dodo.subscriptions.retrieve(requestedSubscriptionId);
+        const subCustomerId = sub.customer.customer_id;
+        await updateActivePlan(supabaseClient, user.id, subCustomerId, {
+          subscription_id: sub.subscription_id,
+          product_id: sub.product_id,
+          previous_billing_date: sub.previous_billing_date,
+          next_billing_date: sub.next_billing_date,
+          status: sub.status,
+          cancel_at_next_billing_date: sub.cancel_at_next_billing_date,
+        });
+        await recordBillingEvent(supabaseClient, user.id, "subscription.sync", {
+          source: "direct_subscription_id",
+          subscriptionId: sub.subscription_id,
+          productId: sub.product_id,
+          status: sub.status ?? "active",
+          email: user.email,
+        }, {
+          status: sub.status ?? "active",
+          customerId: subCustomerId,
+          subscriptionId: sub.subscription_id,
+          productId: sub.product_id,
+          email: user.email,
+        });
+        const isCancelling = sub.cancel_at_next_billing_date;
+        logStep("Synced via direct subscription ID", { subId: sub.subscription_id });
+        return new Response(JSON.stringify({
+          subscribed: true,
+          plan: getBillingPlanName(getBillingPlanFromProductId(sub.product_id)),
+          subscription_end: sub.next_billing_date || null,
+          subscription_id: sub.subscription_id,
+          cancelling_at: isCancelling ? sub.next_billing_date || null : null,
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
+      } catch (err) {
+        logStep("Direct subscription retrieval failed, falling through", {
+          id: requestedSubscriptionId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        if (requestedCheckoutPlan !== "free") {
+          await updateFromCheckoutFallback(supabaseClient, user.id, requestedCheckoutPlan, requestedSubscriptionId);
+          await recordBillingEvent(supabaseClient, user.id, "subscription.sync_fallback", {
+            source: "checkout_return_url",
+            purchasedPlan: requestedCheckoutPlan,
+            subscriptionId: requestedSubscriptionId,
+            email: user.email,
+          }, {
+            status: "active",
+            subscriptionId: requestedSubscriptionId,
+            email: user.email,
+          });
+          return new Response(JSON.stringify({
+            subscribed: true,
+            plan: getBillingPlanName(requestedCheckoutPlan),
+            subscription_end: null,
+            subscription_id: requestedSubscriptionId,
+            cancelling_at: null,
+          }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
+        }
+      }
     }
 
     const { data: billingRecord } = await supabaseClient
@@ -253,6 +479,19 @@ serve(async (req) => {
         status: subscriptionFromStorage.status,
         cancel_at_next_billing_date: subscriptionFromStorage.cancel_at_next_billing_date,
       });
+      await recordBillingEvent(supabaseClient, user.id, "subscription.sync", {
+        source: "stored_subscription_id",
+        subscriptionId: subscriptionFromStorage.subscription_id,
+        productId: subscriptionFromStorage.product_id,
+        status: subscriptionFromStorage.status ?? "active",
+        email: user.email,
+      }, {
+        status: subscriptionFromStorage.status ?? "active",
+        customerId: customerId ?? subscriptionFromStorage.customer.customer_id,
+        subscriptionId: subscriptionFromStorage.subscription_id,
+        productId: subscriptionFromStorage.product_id,
+        email: user.email,
+      });
 
       const isCancelling = subscriptionFromStorage.cancel_at_next_billing_date;
       return new Response(JSON.stringify({
@@ -264,7 +503,47 @@ serve(async (req) => {
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
     }
 
+    // Helper: return current DB values without modifying them.
+    // Used when Dodo has no subscription yet (e.g. brief window after checkout
+    // before the webhook fires). Actual downgrades come from webhook events.
+    const returnCurrentDbValues = () => {
+      const dbPlan = userData?.plan ?? "free";
+      const isPaid = dbPlan.toLowerCase() !== "free";
+      const isCancelling = userData?.subscription_status === "cancelling";
+      return new Response(JSON.stringify({
+        subscribed: isPaid,
+        plan: dbPlan,
+        subscription_end: isCancelling ? (userData?.plan_expires_at ?? null) : null,
+        subscription_id: null,
+        cancelling_at: isCancelling ? (userData?.plan_expires_at ?? null) : null,
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
+    };
+
     if (!customerId) {
+      // No Dodo customer at all → safe to reset only if they're already on free
+      if ((userData?.plan ?? "free").toLowerCase() !== "free") {
+        return returnCurrentDbValues();
+      }
+      if (requestedCheckoutPlan !== "free") {
+        await updateFromCheckoutFallback(supabaseClient, user.id, requestedCheckoutPlan, requestedSubscriptionId);
+        await recordBillingEvent(supabaseClient, user.id, "subscription.sync_fallback", {
+          source: "checkout_return_url_no_customer",
+          purchasedPlan: requestedCheckoutPlan,
+          subscriptionId: requestedSubscriptionId,
+          email: user.email,
+        }, {
+          status: "active",
+          subscriptionId: requestedSubscriptionId,
+          email: user.email,
+        });
+        return new Response(JSON.stringify({
+          subscribed: true,
+          plan: getBillingPlanName(requestedCheckoutPlan),
+          subscription_end: null,
+          subscription_id: requestedSubscriptionId,
+          cancelling_at: null,
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
+      }
       await updateFreePlan(supabaseClient, user.id);
       return new Response(JSON.stringify({ subscribed: false, plan: "free", subscription_end: null, subscription_id: null, cancelling_at: null }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
     }
@@ -278,6 +557,32 @@ serve(async (req) => {
     }
 
     if (!subscription) {
+      // Dodo has no active subscription right now. If the user is on a paid plan
+      // in our DB, don't reset — the payment webhook will do it if truly cancelled.
+      // This prevents false downgrades in the brief window after checkout.
+      if ((userData?.plan ?? "free").toLowerCase() !== "free") {
+        return returnCurrentDbValues();
+      }
+      if (requestedCheckoutPlan !== "free") {
+        await updateFromCheckoutFallback(supabaseClient, user.id, requestedCheckoutPlan, requestedSubscriptionId);
+        await recordBillingEvent(supabaseClient, user.id, "subscription.sync_fallback", {
+          source: "checkout_return_url_no_active_subscription",
+          purchasedPlan: requestedCheckoutPlan,
+          subscriptionId: requestedSubscriptionId,
+          email: user.email,
+        }, {
+          status: "active",
+          subscriptionId: requestedSubscriptionId,
+          email: user.email,
+        });
+        return new Response(JSON.stringify({
+          subscribed: true,
+          plan: getBillingPlanName(requestedCheckoutPlan),
+          subscription_end: null,
+          subscription_id: requestedSubscriptionId,
+          cancelling_at: null,
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
+      }
       await updateFreePlan(supabaseClient, user.id, customerId);
       return new Response(JSON.stringify({ subscribed: false, plan: "free", subscription_end: null, subscription_id: null, cancelling_at: null }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
     }

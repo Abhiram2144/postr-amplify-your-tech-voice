@@ -9,7 +9,7 @@ interface SubscriptionContextType {
   subscriptionEnd: string | null;
   cancellingAt: string | null;
   loading: boolean;
-  checkSubscription: () => Promise<void>;
+  checkSubscription: (opts?: { subscriptionId?: string; purchasedPlan?: string; purchasedPriceId?: string }) => Promise<void>;
   openCheckout: (priceId: string) => Promise<void>;
   openEmbeddedCheckout: (priceId: string) => Promise<string | null>;
   openCustomerPortal: () => Promise<void>;
@@ -33,7 +33,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     return "free";
   };
 
-  const checkSubscription = useCallback(async () => {
+  const checkSubscription = useCallback(async (opts?: { subscriptionId?: string; purchasedPlan?: string; purchasedPriceId?: string }) => {
     if (!session?.access_token) {
       setPlan("free");
       setSubscribed(false);
@@ -45,7 +45,15 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       setLoading(true);
+      const body = opts?.subscriptionId || opts?.purchasedPlan || opts?.purchasedPriceId
+        ? {
+            subscriptionId: opts.subscriptionId,
+            purchasedPlan: opts.purchasedPlan,
+            purchasedPriceId: opts.purchasedPriceId,
+          }
+        : undefined;
       const { data, error } = await supabase.functions.invoke("check-subscription", {
+        body,
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },

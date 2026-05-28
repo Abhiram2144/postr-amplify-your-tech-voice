@@ -40,12 +40,40 @@ const itemVariants = {
   show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.4, 0, 0.2, 1] as const } },
 };
 
+const resolvePurchasedPlan = (rawPlan?: string | null, rawPriceId?: string | null): string | undefined => {
+  const plan = (rawPlan ?? "").toLowerCase();
+  if (plan.includes("pro")) return "pro";
+  if (plan.includes("creator")) return "creator";
+
+  const priceId = rawPriceId ?? "";
+  if (!priceId) return undefined;
+
+  if (
+    priceId === STRIPE_PLANS.pro.monthly.priceId ||
+    priceId === STRIPE_PLANS.pro.yearly.priceId
+  ) {
+    return "pro";
+  }
+
+  if (
+    priceId === STRIPE_PLANS.creator.monthly.priceId ||
+    priceId === STRIPE_PLANS.creator.yearly.priceId
+  ) {
+    return "creator";
+  }
+
+  return undefined;
+};
+
 const DashboardOverview = () => {
   const { profile } = useOutletContext<DashboardContext>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { plan, checkSubscription } = useSubscription();
   const [showCheckoutSuccess, setShowCheckoutSuccess] = useState(false);
+  const [purchasedPlan, setPurchasedPlan] = useState<string | undefined>(undefined);
+  const [purchasedPriceId, setPurchasedPriceId] = useState<string | undefined>(undefined);
+  const [checkoutSubscriptionId, setCheckoutSubscriptionId] = useState<string | undefined>(undefined);
   const { projects, loading: projectsLoading } = useProjects();
   const { creditsUsed, creditsLimit, creditsRemaining, loading: creditsLoading } = useCredits();
   const { videoUsed, loading: videoLoading } = useVideoUsage();
@@ -58,12 +86,26 @@ const DashboardOverview = () => {
     const dodoSuccess = status === "active" || Boolean(subscriptionId);
 
     if (checkoutSuccess || dodoSuccess) {
+      // Resolve plan before wiping params so modal shows the right tier immediately.
+      const resolvedPlan = resolvePurchasedPlan(
+        searchParams.get("purchased_plan"),
+        searchParams.get("purchased_price_id"),
+      );
+      const subId = subscriptionId || undefined;
+      const priceId = searchParams.get("purchased_price_id") || undefined;
+      setPurchasedPlan(resolvedPlan);
+      setPurchasedPriceId(priceId);
+      setCheckoutSubscriptionId(subId);
       setShowCheckoutSuccess(true);
-      // Remove checkout and Dodo params
-      ["checkout", "subscription_id", "status", "email"].forEach((key) => searchParams.delete(key));
+      // Remove all checkout/Dodo params from URL
+      ["checkout", "purchased_plan", "purchased_price_id", "subscription_id", "status", "email"].forEach((key) => searchParams.delete(key));
       setSearchParams(searchParams, { replace: true });
-      // Refresh subscription status
-      checkSubscription();
+      // Kick off a background subscription sync — pass subscription_id for direct retrieval
+      checkSubscription({
+        subscriptionId: subId,
+        purchasedPlan: resolvedPlan,
+        purchasedPriceId: priceId,
+      });
     }
   }, [searchParams, setSearchParams, checkSubscription]);
 
@@ -114,9 +156,13 @@ const DashboardOverview = () => {
   return (
     <>
       {/* Checkout Success Modal */}
-      <CheckoutSuccessModal 
-        open={showCheckoutSuccess} 
-        onClose={() => setShowCheckoutSuccess(false)} 
+      <CheckoutSuccessModal
+        open={showCheckoutSuccess}
+        onClose={() => setShowCheckoutSuccess(false)}
+        purchasedPlan={purchasedPlan}
+        checkoutSubscriptionId={checkoutSubscriptionId}
+        checkoutPurchasedPlan={purchasedPlan}
+        checkoutPurchasedPriceId={purchasedPriceId}
       />
       
       <div className="p-6 lg:p-8 max-w-5xl mx-auto">

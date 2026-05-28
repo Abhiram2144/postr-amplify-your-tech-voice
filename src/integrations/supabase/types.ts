@@ -254,6 +254,68 @@ export type Database = {
         }
         Relationships: []
       }
+      billing_events: {
+        Row: {
+          amount: number | null
+          created_at: string
+          currency: string | null
+          customer_id: string | null
+          email: string | null
+          event_id: string | null
+          event_type: string
+          id: string
+          payload: Json
+          product_id: string | null
+          provider: string
+          status: string | null
+          subscription_id: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string
+          currency?: string | null
+          customer_id?: string | null
+          email?: string | null
+          event_id?: string | null
+          event_type: string
+          id?: string
+          payload?: Json
+          product_id?: string | null
+          provider?: string
+          status?: string | null
+          subscription_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string
+          currency?: string | null
+          customer_id?: string | null
+          email?: string | null
+          event_id?: string | null
+          event_type?: string
+          id?: string
+          payload?: Json
+          product_id?: string | null
+          provider?: string
+          status?: string | null
+          subscription_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       users: {
         Row: {
           auth_provider: string | null

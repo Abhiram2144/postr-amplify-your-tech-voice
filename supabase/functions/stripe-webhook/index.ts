@@ -16,23 +16,29 @@ const BILLING_LIMITS: Record<BillingPlan, { monthly_generation_limit: number; mo
   pro: { monthly_generation_limit: 150, monthly_video_limit: 999 },
 };
 
-const getBillingPlanIds = () => isDodoTestMode()
-  ? {
-    creator: Deno.env.get("VITE_DODO_PAYMENTS_TEST_CREATOR_PLAN_ID")
-      ?? Deno.env.get("DODO_PAYMENTS_TEST_CREATOR_PLAN_ID")
-      ?? "",
-    pro: Deno.env.get("VITE_DODO_PAYMENTS_TEST_PRO_PLAN_ID")
-      ?? Deno.env.get("DODO_PAYMENTS_TEST_PRO_PLAN_ID")
-      ?? "",
-  }
-  : {
-    creator: Deno.env.get("VITE_DODO_PAYMENTS_LIVE_CREATOR_PLAN_ID")
-      ?? Deno.env.get("DODO_PAYMENTS_LIVE_CREATOR_PLAN_ID")
-      ?? "",
-    pro: Deno.env.get("VITE_DODO_PAYMENTS_LIVE_PRO_PLAN_ID")
-      ?? Deno.env.get("DODO_PAYMENTS_LIVE_PRO_PLAN_ID")
-      ?? "",
-  };
+const getBillingPlanIds = () => {
+  const creator = [
+    Deno.env.get("VITE_DODO_PAYMENTS_TEST_CREATOR_PLAN_ID"),
+    Deno.env.get("DODO_PAYMENTS_TEST_CREATOR_PLAN_ID"),
+    Deno.env.get("VITE_DODO_PAYMENTS_LIVE_CREATOR_PLAN_ID"),
+    Deno.env.get("DODO_PAYMENTS_LIVE_CREATOR_PLAN_ID"),
+    // Safe fallback defaults used by the frontend config.
+    "pdt_0NffmIHXyeyk4FbvQp7ws",
+    "pdt_0NfdX0P9ZkOoqgRFPDbB0",
+  ].filter((id): id is string => Boolean(id));
+
+  const pro = [
+    Deno.env.get("VITE_DODO_PAYMENTS_TEST_PRO_PLAN_ID"),
+    Deno.env.get("DODO_PAYMENTS_TEST_PRO_PLAN_ID"),
+    Deno.env.get("VITE_DODO_PAYMENTS_LIVE_PRO_PLAN_ID"),
+    Deno.env.get("DODO_PAYMENTS_LIVE_PRO_PLAN_ID"),
+    // Safe fallback defaults used by the frontend config.
+    "pdt_0NffmNtlpKjbXPnkuOXmz",
+    "pdt_0NfdXA9uKpt86ZvHFlGfD",
+  ].filter((id): id is string => Boolean(id));
+
+  return { creator, pro };
+};
 
 const getDodoApiKey = () =>
   isDodoTestMode()
@@ -68,8 +74,9 @@ const getDodoClient = () => {
 const getBillingPlanFromProductId = (productId?: string | null): BillingPlan => {
   const billingPlanIds = getBillingPlanIds();
   if (!productId) return "free";
-  if (productId === billingPlanIds.creator) return "creator";
-  if (productId === billingPlanIds.pro) return "pro";
+  if (billingPlanIds.creator.includes(productId)) return "creator";
+  if (billingPlanIds.pro.includes(productId)) return "pro";
+  logStep("Unknown product_id when mapping plan", { productId, mode: isDodoTestMode() ? "test_mode" : "live_mode" });
   return "free";
 };
 
@@ -86,6 +93,97 @@ const logStep = (step: string, details?: Record<string, unknown>) => {
   console.log(`[DODO-WEBHOOK] ${step}${detailsStr}`);
 };
 
+const recordBillingEvent = async (
+  supabaseClient: ReturnType<typeof createClient>,
+  eventType: string,
+  payload: Record<string, unknown>,
+  userId?: string | null,
+  extras?: {
+    eventId?: string | null;
+    status?: string | null;
+    customerId?: string | null;
+    subscriptionId?: string | null;
+    productId?: string | null;
+    amount?: number | null;
+    currency?: string | null;
+    email?: string | null;
+  },
+) => {
+  const { data, error } = await supabaseClient.from("billing_events").insert({
+    user_id: userId ?? null,
+    provider: "dodo",
+    event_type: eventType,
+    event_id: extras?.eventId ?? null,
+    status: extras?.status ?? null,
+    customer_id: extras?.customerId ?? null,
+    subscription_id: extras?.subscriptionId ?? null,
+    product_id: extras?.productId ?? null,
+    amount: extras?.amount ?? null,
+    currency: extras?.currency ?? null,
+    email: extras?.email ?? null,
+    payload,
+    updated_at: new Date().toISOString(),
+  }).select("id");
+
+  if (error) {
+    logStep("Billing event insert failed", { eventType, userId, error: error.message });
+    throw error;
+  }
+
+  if (!data?.length) {
+    throw new Error(`Billing event insert failed for ${eventType}`);
+  }
+};
+
+const updateUserPlanRow = async (
+  supabaseClient: ReturnType<typeof createClient>,
+  userId: string,
+  values: Record<string, unknown>,
+  context: string,
+) => {
+  logStep(`${context}: updating users row`, { userId, plan: values.plan, subscription_status: values.subscription_status });
+  const { data, error } = await supabaseClient
+    .from("users")
+    .update(values)
+    .eq("id", userId)
+    .select("id");
+
+  if (error) {
+    logStep(`${context}: users update failed`, { userId, error: error.message });
+    throw error;
+  }
+
+  if (!data?.length) {
+    throw new Error(`${context}: no users row found for user ${userId}`);
+  }
+
+  logStep(`${context}: users update success`, { userId, rows: data.length });
+};
+
+const upsertUserStripeData = async (
+  supabaseClient: ReturnType<typeof createClient>,
+  record: Record<string, unknown>,
+  context: string,
+) => {
+  const userId = typeof record.user_id === "string" ? record.user_id : "unknown";
+  logStep(`${context}: upserting user_stripe_data`, { userId, subscriptionId: record.stripe_subscription_id ?? null });
+  const { data, error } = await supabaseClient
+    .from("user_stripe_data")
+    .upsert(record, { onConflict: "user_id" })
+    .select("user_id");
+
+  if (error) {
+    logStep(`${context}: user_stripe_data upsert failed`, { userId, error: error.message });
+    throw error;
+  }
+
+  if (!data?.length) {
+    throw new Error(`${context}: no user_stripe_data row returned for user ${userId}`);
+  }
+
+  logStep(`${context}: user_stripe_data upsert success`, { userId, rows: data.length });
+};
+
 const upsertBillingRecord = async (
   supabaseClient: ReturnType<typeof createClient>,
   userId: string,
@@ -100,9 +198,7 @@ const upsertBillingRecord = async (
   if (customerId !== undefined) record.stripe_customer_id = customerId;
   if (subscriptionId !== undefined) record.stripe_subscription_id = subscriptionId;
 
-  await supabaseClient
-    .from("user_stripe_data")
-    .upsert(record, { onConflict: "user_id" });
+  await upsertUserStripeData(supabaseClient, record, "upsertBillingRecord");
 };
 
 const setUserPlan = async (
@@ -116,17 +212,14 @@ const setUserPlan = async (
   const plan = getBillingPlanFromProductId(productId);
   const limits = getBillingLimits(plan);
 
-  await supabaseClient
-    .from("users")
-    .update({
-      plan: getBillingPlanName(plan),
-      plan_started_at: startedAt ?? new Date().toISOString(),
-      plan_expires_at: expiresAt ?? null,
-      subscription_status: subscriptionStatus,
-      plan_override_by_admin: false,
-      ...limits,
-    })
-    .eq("id", userId);
+  await updateUserPlanRow(supabaseClient, userId, {
+    plan: getBillingPlanName(plan),
+    plan_started_at: startedAt ?? new Date().toISOString(),
+    plan_expires_at: expiresAt ?? null,
+    subscription_status: subscriptionStatus,
+    plan_override_by_admin: false,
+    ...limits,
+  }, "setUserPlan");
 };
 
 const downgradeToFree = async (
@@ -135,18 +228,15 @@ const downgradeToFree = async (
   keepCustomerId?: string | null,
   subscriptionStatus: SubscriptionStatus = "cancelled",
 ) => {
-  await supabaseClient
-    .from("users")
-    .update({
-      plan: "free",
-      plan_started_at: null,
-      plan_expires_at: null,
-      subscription_status: subscriptionStatus,
-      plan_override_by_admin: false,
-      monthly_generation_limit: BILLING_LIMITS.free.monthly_generation_limit,
-      monthly_video_limit: BILLING_LIMITS.free.monthly_video_limit,
-    })
-    .eq("id", userId);
+  await updateUserPlanRow(supabaseClient, userId, {
+    plan: "free",
+    plan_started_at: null,
+    plan_expires_at: null,
+    subscription_status: subscriptionStatus,
+    plan_override_by_admin: false,
+    monthly_generation_limit: BILLING_LIMITS.free.monthly_generation_limit,
+    monthly_video_limit: BILLING_LIMITS.free.monthly_video_limit,
+  }, "downgradeToFree");
 
   await upsertBillingRecord(supabaseClient, userId, keepCustomerId ?? null, null);
 };
@@ -226,10 +316,25 @@ serve(async (req) => {
     const event = dodo.webhooks.unwrap(body, { headers, key: webhookSecret });
     logStep("Event received", { type: event.type, businessId: event.business_id });
 
+    const eventPayload = event.data as Record<string, unknown>;
+    const eventId = typeof (event as Record<string, unknown>).id === "string"
+      ? (event as Record<string, unknown>).id as string
+      : typeof (event as Record<string, unknown>).event_id === "string"
+        ? (event as Record<string, unknown>).event_id as string
+        : null;
+
     switch (event.type) {
       case "payment.succeeded": {
         const payment = event.data;
         const userId = await findUserByEmail(supabaseClient, payment.customer.email);
+        await recordBillingEvent(supabaseClient, event.type, eventPayload, userId, {
+          eventId,
+          status: "succeeded",
+          customerId: payment.customer.customer_id,
+          subscriptionId: payment.subscription_id ?? null,
+          productId: payment.product_cart?.[0]?.product_id ?? null,
+          email: payment.customer.email,
+        });
         if (!userId) break;
 
         await upsertBillingRecord(supabaseClient, userId, payment.customer.customer_id, payment.subscription_id ?? null);
@@ -255,6 +360,14 @@ serve(async (req) => {
       case "payment.cancelled": {
         const payment = event.data;
         const userId = await findUserByEmail(supabaseClient, payment.customer.email);
+        await recordBillingEvent(supabaseClient, event.type, eventPayload, userId, {
+          eventId,
+          status: typeof payment.status === "string" ? payment.status : event.type.split(".")[1] ?? null,
+          customerId: payment.customer.customer_id,
+          subscriptionId: payment.subscription_id ?? null,
+          productId: payment.product_cart?.[0]?.product_id ?? null,
+          email: payment.customer.email,
+        });
         if (!userId) break;
 
         await upsertBillingRecord(supabaseClient, userId, payment.customer.customer_id, payment.subscription_id ?? null);
@@ -278,6 +391,14 @@ serve(async (req) => {
       case "subscription.on_hold": {
         const subscription = event.data;
         const userId = await findUserByEmail(supabaseClient, subscription.customer.email);
+        await recordBillingEvent(supabaseClient, event.type, eventPayload, userId, {
+          eventId,
+          status: typeof subscription.status === "string" ? subscription.status : null,
+          customerId: subscription.customer.customer_id,
+          subscriptionId: subscription.subscription_id,
+          productId: subscription.product_id,
+          email: subscription.customer.email,
+        });
         if (!userId) break;
         await syncSubscription(supabaseClient, userId, subscription.customer.customer_id, subscription);
         break;
@@ -286,6 +407,14 @@ serve(async (req) => {
       case "subscription.cancelled": {
         const subscription = event.data;
         const userId = await findUserByEmail(supabaseClient, subscription.customer.email);
+        await recordBillingEvent(supabaseClient, event.type, eventPayload, userId, {
+          eventId,
+          status: typeof subscription.status === "string" ? subscription.status : "cancelled",
+          customerId: subscription.customer.customer_id,
+          subscriptionId: subscription.subscription_id,
+          productId: subscription.product_id,
+          email: subscription.customer.email,
+        });
         if (!userId) break;
         await downgradeToFree(supabaseClient, userId, subscription.customer.customer_id, "cancelled");
         break;
@@ -294,6 +423,14 @@ serve(async (req) => {
       case "subscription.expired": {
         const subscription = event.data;
         const userId = await findUserByEmail(supabaseClient, subscription.customer.email);
+        await recordBillingEvent(supabaseClient, event.type, eventPayload, userId, {
+          eventId,
+          status: typeof subscription.status === "string" ? subscription.status : "expired",
+          customerId: subscription.customer.customer_id,
+          subscriptionId: subscription.subscription_id,
+          productId: subscription.product_id,
+          email: subscription.customer.email,
+        });
         if (!userId) break;
         await downgradeToFree(supabaseClient, userId, subscription.customer.customer_id, "expired");
         break;
@@ -302,6 +439,14 @@ serve(async (req) => {
       case "subscription.failed": {
         const subscription = event.data;
         const userId = await findUserByEmail(supabaseClient, subscription.customer.email);
+        await recordBillingEvent(supabaseClient, event.type, eventPayload, userId, {
+          eventId,
+          status: typeof subscription.status === "string" ? subscription.status : "failed",
+          customerId: subscription.customer.customer_id,
+          subscriptionId: subscription.subscription_id,
+          productId: subscription.product_id,
+          email: subscription.customer.email,
+        });
         if (!userId) break;
         await downgradeToFree(supabaseClient, userId, subscription.customer.customer_id, "failed");
         break;
