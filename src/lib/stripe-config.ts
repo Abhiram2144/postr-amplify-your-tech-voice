@@ -22,13 +22,13 @@ export const STRIPE_PLANS = {
     monthly: {
       priceId: DODO_CREATOR_PRODUCT_ID,
       productId: DODO_CREATOR_PRODUCT_ID,
-      price: 8,
+      price: 5,
     },
     yearly: {
       priceId: DODO_CREATOR_PRODUCT_ID,
       productId: DODO_CREATOR_PRODUCT_ID,
-      price: 76.80, // 20% off ($8 * 12 * 0.8)
-      monthlyEquivalent: 6.40,
+      price: 48,
+      monthlyEquivalent: 4,
     },
     limits: {
       ideasPerMonth: 60,
@@ -42,13 +42,13 @@ export const STRIPE_PLANS = {
     monthly: {
       priceId: DODO_PRO_PRODUCT_ID,
       productId: DODO_PRO_PRODUCT_ID,
-      price: 15,
+      price: 10,
     },
     yearly: {
       priceId: DODO_PRO_PRODUCT_ID,
       productId: DODO_PRO_PRODUCT_ID,
-      price: 144, // 20% off ($15 * 12 * 0.8)
-      monthlyEquivalent: 12,
+      price: 96,
+      monthlyEquivalent: 8,
     },
     limits: {
       ideasPerMonth: 150,
