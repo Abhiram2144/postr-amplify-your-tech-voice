@@ -78,26 +78,7 @@ const HeroSection = () => {
       opacity
     }} className="container relative mx-auto flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center px-4 py-20 text-center">
         {/* Badge */}
-        <motion.div initial={{
-        opacity: 0,
-        y: 20
-      }} animate={{
-        opacity: 1,
-        y: 0
-      }} transition={{
-        duration: 0.6,
-        ease: "easeOut"
-      }} className="mb-8">
-          <span className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm font-medium text-primary">
-            <motion.span animate={{
-            scale: [1, 1.2, 1]
-          }} transition={{
-            duration: 2,
-            repeat: Infinity
-          }} className="h-2 w-2 rounded-full bg-accent" />
-            Now in public beta
-          </span>
-        </motion.div>
+        
 
         {/* Headline */}
         <motion.h1 initial={{

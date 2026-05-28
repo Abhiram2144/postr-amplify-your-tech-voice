@@ -53,7 +53,7 @@ const Privacy = () => {
                 <h2 className="text-xl font-semibold text-foreground">5. Your Rights</h2>
                 <p className="mt-3">
                   You can access, update, or delete your account data at any time through your dashboard settings. You can request a full data export by contacting us at{" "}
-                  <a href="mailto:privacy@postr.app" className="text-primary hover:underline">privacy@postr.app</a>.
+                  <a href="mailto:abhiram.sathiraju@gmail.com" className="text-primary hover:underline">privacy@postr.app</a>.
                 </p>
               </section>
 
@@ -68,7 +68,7 @@ const Privacy = () => {
                 <h2 className="text-xl font-semibold text-foreground">7. Contact</h2>
                 <p className="mt-3">
                   For privacy-related inquiries, contact us at{" "}
-                  <a href="mailto:privacy@postr.app" className="text-primary hover:underline">privacy@postr.app</a>.
+                  <a href="mailto:abhiram.sathiraju@gmail.com" className="text-primary hover:underline">abhiram.sathiraju@gmail.com</a>.
                 </p>
               </section>
             </div>

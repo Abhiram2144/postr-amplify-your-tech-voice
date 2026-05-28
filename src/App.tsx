@@ -30,6 +30,7 @@ import ProjectsPage from "./pages/dashboard/ProjectsPage";
 import ProjectDetailPage from "./pages/dashboard/ProjectDetailPage";
 import HistoryPage from "./pages/dashboard/HistoryPage";
 import UsagePage from "./pages/dashboard/UsagePage";
+import ReviewsPage from "./pages/dashboard/ReviewsPage";
 import SettingsPage from "./pages/dashboard/SettingsPage";
 
 // Admin imports
@@ -75,6 +76,7 @@ const App = () => (
                   <Route path="projects/:projectId" element={<ProjectDetailPage />} />
                   <Route path="history" element={<HistoryPage />} />
                   <Route path="usage" element={<UsagePage />} />
+                  <Route path="reviews" element={<ReviewsPage />} />
                   <Route path="settings" element={<SettingsPage />} />
                 </Route>
 

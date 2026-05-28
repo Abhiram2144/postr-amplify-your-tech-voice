@@ -25,6 +25,7 @@ import {
   CreditCard,
   ChevronDown,
   Shield,
+  MessageSquare,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
@@ -47,6 +48,7 @@ const navItems = [
 
 const secondaryNavItems = [
   { name: "Usage", path: "/dashboard/usage", icon: BarChart3 },
+  { name: "Reviews", path: "/dashboard/reviews", icon: MessageSquare },
   { name: "Settings", path: "/dashboard/settings", icon: Settings },
 ];
 

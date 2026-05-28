@@ -57,6 +57,22 @@ CREATE TABLE public.usage_logs (
   CONSTRAINT usage_logs_pkey PRIMARY KEY (id),
   CONSTRAINT usage_logs_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
+CREATE TABLE public.user_feedback (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  rating integer NOT NULL,
+  category text DEFAULT 'general'::text,
+  subject text,
+  message text NOT NULL,
+  page_context text,
+  source text DEFAULT 'dashboard'::text,
+  status text DEFAULT 'new'::text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT user_feedback_pkey PRIMARY KEY (id),
+  CONSTRAINT user_feedback_rating_check CHECK (((rating >= 1) AND (rating <= 5))),
+  CONSTRAINT user_feedback_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+);
 CREATE TABLE public.user_roles (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
